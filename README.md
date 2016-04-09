@@ -14,9 +14,9 @@ This repository includes the two files that **must be included** in all project 
 [Enter a short description]
 
 ### Team Members
-- [Team Leader Name, email address]
-- [Additional Team Members, email address]
-- [...]
+- [Chandra Gaajula, chandra@TEKPartner.net]
+- [Aravind Karnam, aravind.karnam@TEKPartner.net]
+- [Bhushan Ladde, bhushan.ladde@TEKPartner.net]
 
 ### Stakeholder Engagement
 - [If you worked with County staff to develop your project, please enter the name and department of your contact]
