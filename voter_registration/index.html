@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html" charset="UTF-8">
+    <title>Voter Registration</title>
+    <script src='https://api.mapbox.com/mapbox.js/v2.3.0/mapbox.js'></script>
+    <link href='https://api.mapbox.com/mapbox.js/v2.3.0/mapbox.css' rel='stylesheet'/>
+    <link rel="stylesheet" href="./css/image_slideshow.css">
+    <link rel="stylesheet" href="./css/popoto.min.css">
+    <link rel="stylesheet" href="./css/demo.css">
+    <link rel="alternate stylesheet" title="neo4j" href="./css/popoto.neo4j.css" disabled>
+</head>
+<body class="ppt-body">
+
+<!-- Header with select option for language and style -->
+<header class="ppt-header">
+    <span class="select-boxes">
+        <label><span id="langlabel">Language:</span>
+            <select id="language">
+                <option value="en_US">English</option>
+                <option value="sp_US">Spanish</option>
+                <option value="kl_US">Kli</option>
+            </select>
+        </label>
+    </span>
+</header>
+
+<section class="ppt-section-main">
+    <div class="ppt-container-graph">
+        <div id="popoto-graph" class="ppt-div-graph">
+            <!-- Graph will be generated here-->
+        </div>
+    </div>
+
+    <div id="popoto-query" class="ppt-container-query">
+        <!-- Query viewer will be generated here -->
+    </div>
+
+    <div class="ppt-section-header">
+        <!-- The total results count is updated with a listener defined below -->
+        <span id="results">RESULTS</span> <span id="result-total-count" class="ppt-count"></span>
+        <span style="float: right; font-size: 16px; font-weight: normal;">
+        <label><span id="reschooser">Displayed results:</span>
+            <select id="res-display">
+                <option value="5">5</option>
+                <option value="10" selected="selected">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="500">500</option>
+                <option value="1000">1000</option>
+                <option value="2000">2000</option>
+            </select>
+        </label>
+        </span>
+    </div>
+
+    <div class="res-container">
+        <div id="popoto-results" class="ppt-container-results">
+            <!-- Results are generated here -->
+        </div>
+        <div id="map" class="map">
+            <!-- map generated here -->
+        </div>
+    </div>
+
+</section>
+
+<!---------------------->
+<!-- Required scripts -->
+<script src="./js/svg-data.js" charset="utf-8"></script>
+<script src="./js/svg-us-region-data.js" charset="utf-8"></script>
+
+<!-- Jquery is only used in popoto.js to send ajax POST request on Neo4j REST API -->
+<!-- This dependency will probably be removed in future releases -->
+<script src='https://code.jquery.com/jquery-1.11.0.min.js'></script>
+<script src="./js/d3.v3.min.js" charset="utf-8"></script>
+<script src="./js/popoto.min.js" charset="utf-8"></script>
+
+
+<script>
+
+    //----------------------------- MAPBOX initialization
+    L.mapbox.accessToken = "<<<L.mapbox.accessToken>>>";
+    var map = L.mapbox.map('map', 'mapbox.streets');
+    map.scrollWheelZoom.disable();
+    var mLayer = L.mapbox.featureLayer().addTo(map);
+    // ------------------------------------------
+
+    /**
+     * URL used to access Neo4j REST API to execute queries.
+     * Update this parameter to your running server instance.
+     *
+     * For more information on Neo4J REST API the documentation is available here: http://neo4j.com/docs/stable/rest-api-cypher.html
+     */
+	 popoto.rest.CYPHER_URL = "http://localhost:7474/db/data/transaction";
+
+    /**
+     * Add this authorization property if your Neo4j server uses basic HTTP authentication.
+     * The value of this property must be "Basic <payload>", where "payload" is a base64 encoded string of "username:password".
+     *
+     * "btoa" is a JavaScript function that can be used to encode the user and password value in base64 but it is recommended to directly use the Base64 value.
+     *
+     *  For example Base64 encoded value of "neo4j:password" is "bmVvNGo6cGFzc3dvcmQ="
+     */
+	 popoto.rest.AUTHORIZATION = "Basic " + btoa("neo4j:neo4j");
+
+    var childrenNodesForOption = [
+        "NODE_5_signage",
+        "NODE_1_parkingArea",
+        "NODE_31_1Doorways",
+        "NODE_71_elevatorsLifts",
+        "NODE_4_theVotingArea",
+        "NODE_34_4AdditionalHallway",
+        "NODE_61_1Ramps",
+        "NODE_2_pathOfTravel",
+        "NODE_32_2Hallways",
+        "NODE_33_3AdditionalDoors",
+        "NODE_62_2Curbramp"];
+    var childrenNodesForSubCategory = [
+        "NODE_2_pathOfTravel_5propertyline",
+        "NODE_33_3AdditionalDoors_1mitigationadditionaldoor1",
+        "NODE_1_parkingArea_general",
+        "NODE_33_3AdditionalDoors_2mitigationadditionaldoor2",
+        "NODE_33_3AdditionalDoors_3additionaldoor3",
+        "NODE_33_3AdditionalDoors_4additionaldoor4",
+        "NODE_2_pathOfTravel_6other",
+        "NODE_4_theVotingArea_mitigation",
+        "NODE_2_pathOfTravel_2parking",
+        "NODE_62_2Curbramp_curbramp3",
+        "NODE_61_1Ramps_ramp1",
+        "NODE_61_1Ramps_ramp2",
+        "NODE_71_elevatorsLifts_5emergencycontrols",
+        "NODE_62_2Curbramp_curbramp2",
+        "NODE_32_2Hallways_general",
+        "NODE_2_pathOfTravel_6otherpathmitigation",
+        "NODE_33_3AdditionalDoors_3mitigationadditionaldoor3",
+        "NODE_5_signage_general",
+        "NODE_2_pathOfTravel_2publictransportation",
+        "NODE_12_parkingArea_2additionalparkingmitigation",
+        "NODE_71_elevatorsLifts_2votingareaflooroutsidetheelevator",
+        "NODE_71_elevatorsLifts_3insidetheelevator",
+        "NODE_2_pathOfTravel_1parking",
+        "NODE_72_elevatorsLifts_7wheelchairlifts",
+        "NODE_71_elevatorsLifts_4controlpanel",
+        "NODE_33_3AdditionalDoors_1additionaldoor1",
+        "NODE_10_parkingArea_0parkingmitigation",
+        "NODE_72_elevatorsLifts_8wheelchairlifts",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator",
+        "NODE_2_pathOfTravel_3dropoffzone",
+        "NODE_62_2Curbramp_curbramp1",
+        "NODE_61_1Ramps_ramp3",
+        "NODE_34_4AdditionalHallway_6additionalhallway",
+        "NODE_34_4AdditionalHallway_general",
+        "NODE_12_parkingArea_2additionalparking",
+        "NODE_31_1Doorways_2mitigationfordoorway",
+        "NODE_2_pathOfTravel_4propertyline",
+        "NODE_1_parkingArea_0parkingmitigation",
+        "NODE_2_pathOfTravel_4dropoffzone",
+        "NODE_10_parkingArea_general",
+        "NODE_2_pathOfTravel_5other",
+        "NODE_4_theVotingArea_general",
+        "NODE_11_parkingArea_1dropoffzone",
+        "NODE_31_1Doorways_general",
+        "NODE_32_2Hallways_1mitigationforhallways",
+        "NODE_2_pathOfTravel_4propertylinepathmitigation",
+        "NODE_2_pathOfTravel_3publictransportation",
+        "NODE_33_3AdditionalDoors_2additionaldoor2",
+        "NODE_71_elevatorsLifts_6cardimensions"];
+    var childrenNodesForBoolean = [
+        "NODE_71_elevatorsLifts_4controlpanel_areTheHighestFloorControlButtonsInsideTheElevatorMountedNoHigherThan48AboveTheFloor",
+        "NODE_10_parkingArea_0parkingmitigation_coneOffAisle",
+        "NODE_2_pathOfTravel_6other_doAnyGratingsAlongThePathOfTravelHaveSpacesNoGreaterThan12WidthInTheDirectionOfTravel",
+        "NODE_33_3AdditionalDoors_3mitigationadditionaldoor3_propDoorOpen",
+        "NODE_12_parkingArea_2additionalparking_vanAccessibleinchesSignUnderTheIsa",
+        "NODE_33_3AdditionalDoors_1mitigationadditionaldoor1_propDoorOpen",
+        "NODE_61_1Ramps_ramp1_isTheBottomLandingLevelWithNoMoreThan2SlopeInAnyDirection",
+        "NODE_2_pathOfTravel_2parking_isTheSurfaceOfThePathOfTravelStableFirmAndSlipresistant",
+        "NODE_72_elevatorsLifts_7wheelchairlifts_doesTheLiftHaveStandbyPowerInCaseOfAnEmergencyThatWillAllowTheLiftToOperate5UpAndDownTrips",
+        "NODE_71_elevatorsLifts_2votingareaflooroutsidetheelevator_areTheHallCallButtonsMountedWithTheCenterlineAMaximumOf48AboveTheFloor",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_theLandingOrClearSpaceInFrontOfTheDoorOnThePullSideIsAtLeast32By60",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_doesTheElevatorDoorHaveAnAutomaticReopeningDeviceThatDoesNotRequireContactToActivate",
+        "NODE_12_parkingArea_2additionalparking_noRampsInAccessAisleOrParkingSpace",
+        "NODE_61_1Ramps_ramp2_isTheRampAtLeast48Wide",
+        "NODE_62_2Curbramp_curbramp3_isTheCurbrampAtLeast48Wide",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_isThereAnAudibleVoiceAnnouncingCarArrivalAndDirectionOrAnAudibleSignalWith1ToneForGoingUpAnd2TonesForGoingDown",
+        "NODE_71_elevatorsLifts_2votingareaflooroutsidetheelevator_areThereVisualSignalsAtLeast2WideBy2inchesHighPlacedAtLeast6AboveTheFloorThatLightUpShowingTheArrivalAndDirectionOfTheCar",
+        "NODE_31_1Doorways_2mitigationfordoorway_propDoorOpen",
+        "NODE_61_1Ramps_ramp3_isTheIntermediateLandingLevelWithNoMoreThan2SlopeInAnyDirection",
+        "NODE_34_4AdditionalHallway_6additionalhallway_doChangesInLevelMoreThanHighHaveA5OrLowerSlope",
+        "NODE_2_pathOfTravel_6other_isThePathOfTravelsidewalkAtLeast48Wideor36inchesAtAPointDueToNaturalBarriersOrOtherExistingConditions",
+        "NODE_71_elevatorsLifts_2votingareaflooroutsidetheelevator_doTheHallCallButtonsLightUpWithAWhiteLightWhenActivatedAndGoOutWhenTheElevatorArrives",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_pullSideExteriorDoor24LatchSide",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_theLandingOrClearSpaceInFrontOfTheDoorOnThePushSideIsAtLeast32By48",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_doesTheElevatorDoorStayOpenAtLeast5Seconds",
+        "NODE_62_2Curbramp_curbramp3_isTheSurfaceOfTheCurbrampStableFirmAndSlipresistant",
+        "NODE_61_1Ramps_ramp2_doHandrailsProtrudeNoMoreThan4IntoPathOfTravel",
+        "NODE_2_pathOfTravel_4dropoffzone_ifThePathOfTravelToAnAccessibleEntranceIsNotTheRegularPedestrianRouteIsTheAlternateAcccessiblePathClearlyMarkedWithDirectionalSignage",
+        "NODE_61_1Ramps_ramp2_areTheHandrailsRoundedAndReturnedToTheGroundWallOrPost",
+        "NODE_4_theVotingArea_mitigation_doesTheVotingAreaHaveAdequateLightingForVotingPurposes",
+        "NODE_34_4AdditionalHallway_6additionalhallway_areChangesInLevelFromToinchesHighBeveled",
+        "NODE_2_pathOfTravel_4propertylinepathmitigation_conesNeededForSetup",
+        "NODE_12_parkingArea_2additionalparking_isThereAnotherAdditionalVanOrAutoAccessibleSpaceIfYesWhatIsTheWidth",
+        "NODE_31_1Doorways__isTheDoorThresholdNoMoreThanHigh",
+        "NODE_33_3AdditionalDoors_4additionaldoor4_32DoorWidthAt90Degrees",
+        "NODE_71_elevatorsLifts_2votingareaflooroutsidetheelevator_ifTheClearSpaceInFrontOfTheHallCallButtonsHasOnlyAFrontApproachIsItClearOfAnyObstructionOrIfOnlyASideApproachIsTheClearSpaceFreeFromObjectsThatProjectOutFromTheWallMoreThan10",
+        "NODE_11_parkingArea_1dropoffzone_isThereAVehiclePullUpSpace8WideByAMinimum20Long",
+        "NODE_72_elevatorsLifts_7wheelchairlifts_ifTheLiftEntryDoorHasAFrontApproachIsTheDoorClearSpaceAtLeast32Wide",
+        "NODE_61_1Ramps_ramp3_isTheBottomLandingLevelWithNoMoreThan2SlopeInAnyDirection",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_pullSideLanding32By60inches",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_18OnThePullSideOfInteriorDoor",
+        "NODE_72_elevatorsLifts_7wheelchairlifts_isTheLiftOperableOnTheDayOfTheSurvey",
+        "NODE_2_pathOfTravel_5propertyline_ifThereAreOverheadObstaclesLowerThan80FromTheGroundAlongThePathOfTravelAreThereBarriersToPreventSomeoneFromWalkingUnderneath",
+        "NODE_61_1Ramps_ramp3_isTheTopLandingLevelWithNoMoreThan2SlopeInAnyDirection",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_pullSideInteriorDoor18LatchSide",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_ifAnElevatorIsRequiredToArriveAtTheVotingAreaIsItOnAnAccessiblePathOfTravel",
+        "NODE_72_elevatorsLifts_8wheelchairlifts_doesTheLiftAllowAWheelchairUserUnassistedEntryOperationAndExit",
+        "NODE_2_pathOfTravel_5propertyline_doAllObjectsMountedOnWallsProtrude4OrLessIntoThePathOfTravelforQ910SurveyObjectsBetween27inchesAnd80inchesHigh",
+        "NODE_61_1Ramps_ramp3_doTheHandrailsExtend12HorizontallyOverEachLanding",
+        "NODE_34_4AdditionalHallway_6additionalhallway_in44WideHallwaysAreTherePassingSpaces60inchesBy60inchesOrtIntersectionsPlacedNotMoreThan200Apart",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_pullSideLevelLanding",
+        "NODE_62_2Curbramp_curbramp3_isThereA12WideGroovedBorderCutIntoTheWalkwaySurfaceAlongTheTopAndSidesOfTheCurbramp",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_smooth10AtBottomOfDoorMeasuredFromTheFloorUp",
+        "NODE_33_3AdditionalDoors_4additionaldoor4_smooth10AtBottomOfDoorMeasuredFromTheFloorUp",
+        "NODE_34_4AdditionalHallway_6additionalhallway_doAllInteriorHallwaysInThePathOfTravelHaveAStableFirmAndSlipresistantSurface",
+        "NODE_33_3AdditionalDoors_4additionaldoor4_18OnThePullSideOfInteriorDoor",
+        "NODE_61_1Ramps_ramp2_doesTheRampHaveContinuousHandrailsForTheFullLengthOfTheRampOnBothSidesexceptionAtExteriorDoorsWhenTheRampLandingAndTheDoorLandingOverlapARampDoesNotRequireHandrailsIfItIsLessThan6HighOr72inchesInLength",
+        "NODE_2_pathOfTravel_5other_doChangesInLevelMoreThan12HighHaveA5OrLowerSlopeifTheSlopeInQ7IsMoreThan5SurveyTheChangeInLevelUsingTheRampFormInSection6OfTheChecklist",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_pushSideLanding32By48inches",
+        "NODE_71_elevatorsLifts_2votingareaflooroutsidetheelevator_areTheHallCallButtonsRaisedAboveTheirSurroundingSurface",
+        "NODE_61_1Ramps_ramp2_doTheHandrailsExtend12HorizontallyOverEachLanding",
+        "NODE_71_elevatorsLifts_2votingareaflooroutsidetheelevator_isThereA30By48inchesClearSpaceInFrontOfTheHallCallButtonsThatAllowsAFrontOrParallelApproach",
+        "NODE_32_2Hallways__doAllObjectsMountedOnWallsProtrude4OrLessIntoThePathOfTravel",
+        "NODE_72_elevatorsLifts_8wheelchairlifts_areTheWheelchairLiftControlsUsableWithOneHandWithoutTightGraspingPinchingOrTwistingOfTheWrist",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_smooth10AtBottomOfDoorMeasuredFromTheFloorUp",
+        "NODE_1_parkingArea__noRampsAreEncroachingIntoTheAccessibleParkingSpaceOrAccessAisle",
+        "NODE_10_parkingArea__ifTheSignsAreMountedInThePathOfTravelIsTheBottomEdgeOfTheSign80OrHigher",
+        "NODE_2_pathOfTravel_3dropoffzone_doAllObjectsMountedOnWallsProtrude4OrLessIntoThePathOfTravel",
+        "NODE_31_1Doorways__onThePushSideOfTheDoorIsTheDoorLanding32WideAndAtLeast48inchesDeepPerpendicularToTheDoor",
+        "NODE_2_pathOfTravel_5propertyline_isThePathOfTravelsidewalkAtLeast48Wideor36inchesAtAPointDueToNaturalBarriersOrOtherExistingConditions",
+        "NODE_61_1Ramps_ramp3_isTheSlopeOfTheRamp833OrLess",
+        "NODE_62_2Curbramp_curbramp2_doesTheCurbrampHaveEitherWheelGuidesOrSideFlares",
+        "NODE_62_2Curbramp_curbramp1_isTheBottomLandingAMinimumOf48Long",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_doTheHallCallButtonsLightUpWithAWhiteLightWhenActivatedAndGoOutWhenTheElevatorArrives",
+        "NODE_2_pathOfTravel_4propertyline_doAllOjbectsMountedOnPollsProtrude12OrLessIntoThePathOfTravel",
+        "NODE_71_elevatorsLifts_4controlpanel_doTheRaisedCharactersAndBrailleBesideTheButtonForTheMainFloorAlsoHaveARaisedStarSymbol",
+        "NODE_2_pathOfTravel_1parking_isThePathOfTravelCrossslope2OrLess",
+        "NODE_71_elevatorsLifts_3insidetheelevator_isTheElevatorEquippedWithAudibleOrVerbalCommunicationsThatIndicateTheCarIsStoppingOrPassingEachFloor",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_smooth10AtBottomOfDoorMeasuredFromTheFloorUp",
+        "NODE_61_1Ramps_ramp3_isTheSurfaceOfTheRampStableFirmAndSlipresistant",
+        "NODE_71_elevatorsLifts_6cardimensions_isTheElevatorInteriorDimensionAtLeast51WhenMeasuredFromTheFrontWallToTheBackWall",
+        "NODE_2_pathOfTravel_2parking_isThePathOfTravelCrossslope2OrLess",
+        "NODE_4_theVotingArea__ifThereAreOverheadObstaclesLowerThan80AboveTheFloorAlongThePathOfTravelAreThereBarriersToPreventSomeoneFromWalkingUnderneath",
+        "NODE_2_pathOfTravel_6other_isTheSurfaceOfThePathOfTravelStableFirmAndSlipresistant",
+        "NODE_61_1Ramps_ramp1_isTheRampAtLeast48Wide",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_beveledThresholdAndinches",
+        "NODE_34_4AdditionalHallway_6additionalhallway_isThereAnAccessiblePathOfTravelFromTheEntranceToTheVotingAreaThatIsFreeOfSteps",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_pullSideExteriorDoor24LatchSide",
+        "NODE_61_1Ramps_ramp3_isTheRampAtLeast48Wide",
+        "NODE_2_pathOfTravel_2publictransportation_doAnyGratingsAlongThePathOfTravelHaveSpacesNoGreaterThanWideInTheDirectionOfTravel",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_24OnThePullSideOfExteriorDoor",
+        "NODE_2_pathOfTravel_1parking_isTheSurfaceOfThePathOfTravelStableFirmAndSlipresistant",
+        "NODE_2_pathOfTravel_3publictransportation_doChangesInLevelMoreThan12HighHaveA5OrLowerSlopeifTheSlopeInQ7IsMoreThan5SurveyTheChangeInLevelUsingTheRampFormInSection6OfTheChecklist",
+        "NODE_2_pathOfTravel_5other_doAllObjectsMountedOnWallsProtrude4OrLessIntoThePathOfTravelforQ910SurveyObjectsBetween27inchesAnd80inchesHigh",
+        "NODE_71_elevatorsLifts_4controlpanel_areTheRaisedCharactersLocatedOnTheLeftSideOfEachControlButton",
+        "NODE_31_1Doorways__isThereAtLeast18OfStrikesideClearSpaceOnThePullSideOfAnInteriorDoor",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_accessibleDoorHardware",
+        "NODE_31_1Doorways__isTheForceRequiredToOpenTheDoor5LbfOrLess",
+        "NODE_2_pathOfTravel_5other_doAnyGratingsAlongThePathOfTravelHaveSpacesNoGreaterThan12WidthInTheDirectionOfTravel",
+        "NODE_2_pathOfTravel_4propertyline_isTheMainPathOfTravelToTheVotingAreaFreeOfSteps",
+        "NODE_2_pathOfTravel_6other_ifThereAreOverheadObstaclesLowerThan80FromTheGroundAlongThePathOfTravelAreThereBarriersToPreventSomeoneFromWalkingUnderneath",
+        "NODE_31_1Doorways__isTheDoorHardwareUsableWithOneHandNotRequiringTightGraspingPinchingOrTwistingOfTheWrist",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_beveledThresholdAndinches",
+        "NODE_2_pathOfTravel_2parking_doChangesInLevelMoreThanHighHaveA5OrLowerSlope",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_32DoorWidthAt90Degrees",
+        "NODE_33_3AdditionalDoors_4additionaldoor4_thresholdHeightOrLess",
+        "NODE_31_1Doorways_2mitigationfordoorway_thresholdRampsNeeded",
+        "NODE_61_1Ramps_ramp1_isTheRampCrossslope2OrLess",
+        "NODE_61_1Ramps_ramp2_isThereALandingAtTheTopOfTheRampThatMeasures60WideBy60inchesLong",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_areTheHallCallButtonsMountedWithTheCenterlineAMaximumOf48AboveTheFloor",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_theLandingOrClearSpaceInFrontOfTheDoorOnThePullSideIsAtLeast32By60",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_beveledThresholdAndinches",
+        "NODE_1_parkingArea__isThereAnAutoAccessibleParkingSpaceAtLeast9WideBy18Long",
+        "NODE_62_2Curbramp_curbramp2_isTheMaximumSlopeOfTheCurbrampNoMoreThan833",
+        "NODE_2_pathOfTravel_3dropoffzone_doChangesInLevelMoreThanHighHaveA5OrLowerSlope",
+        "NODE_1_parkingArea__areThereSufficientNumberOfVanAccessibleParkingSpacesForTheSizeOfParkingLot",
+        "NODE_1_parkingArea__isThereAnIsaSignAtTheFrontOfTheParkingSpace",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_accessibleDoorHardware",
+        "NODE_2_pathOfTravel_1parking_doAnyGratingsAlongThePathOfTravelHaveSpacesNoGreaterThanWideInTheDirectionOfTravel",
+        "NODE_62_2Curbramp_curbramp1_doesTheCurbrampHaveEitherWheelGuidesOrSideFlares",
+        "NODE_2_pathOfTravel_2parking_ifNoToQuestion1IsThereAnAlternatePathOfTravelAvailableToTheVotingAreaThatIsFreeOfSteps",
+        "NODE_31_1Doorways__isThereAtLeast24ClearSpaceOnThePullSideOfAnExteriorDoor",
+        "NODE_72_elevatorsLifts_7wheelchairlifts_ifAWheelchairLiftIsUsedToChangeLevelsIsThereA60By60inchesLandingInFrontOfTheLiftDoorifTheLiftWasInstalledPriorTo1114IsThereManeuveringSpaceLargeEnoughForAPersonUsingA30inchesBy48inchesWheelchairToEnterOperateTheLi",
+        "NODE_62_2Curbramp_curbramp1_isTheTopLandingSlopeNoMoreThan2InAnyDirection",
+        "NODE_10_parkingArea__isTheParkingSpaceLocatedSoThatAPersonWithADisabilityWouldNotBeCompelledToWheelOrWalkBehindParkedCarsOtherThanTheirOwn",
+        "NODE_1_parkingArea__isTheAccessAisleSlope2OrLessInAnyDirection",
+        "NODE_1_parkingArea__isTheParkingSpaceLocatedSoThatAPersonWithADisabilityWouldNotBeCompelledToWheelOrWalkBehindParkedCarsOtherThanTheirOwn",
+        "NODE_2_pathOfTravel_3publictransportation_doAllOjbectsMountedOnPollsProtrude12OrLessIntoThePathOfTravel",
+        "NODE_1_parkingArea__isThereAVanAccessibleParkingSpaceAtLeast9WideBy18Long",
+        "NODE_61_1Ramps_ramp3_isTheRampCrossslope2OrLess",
+        "NODE_31_1Doorways__isThere32OfClearWidthAtTheDoorWhenTheDoorIsOpenTo90Degrees",
+        "NODE_71_elevatorsLifts_4controlpanel_areTheRaisedCharactersAndSymbolsWhiteWithABlackBackground",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_18OnThePullSideOfInteriorDoor",
+        "NODE_12_parkingArea_2additionalparking_whatIsTheAccessibleAccessAisle1Slope",
+        "NODE_33_3AdditionalDoors_4additionaldoor4_accessibleDoorHardware",
+        "NODE_62_2Curbramp_curbramp3_isTheMaximumSlopeOfTheCurbrampNoMoreThan833",
+        "NODE_71_elevatorsLifts_5emergencycontrols_doesTheEmergencySystemProvideBothAudibleAndVisualCommunicationToConfirmContactWithEmergencyPersonnel",
+        "NODE_4_theVotingArea__doAllObjectsMountedOnPollsProtrude12OrLessIntoThePathOfTravel",
+        "NODE_33_3AdditionalDoors_1mitigationadditionaldoor1_thresholdRampsNeeded",
+        "NODE_2_pathOfTravel_4dropoffzone_isTheSurfaceOfThePathOfTravelStableFirmAndSlipresistant",
+        "NODE_12_parkingArea_2additionalparking_whatIsTheAccessibleAccessAisle2Slope",
+        "NODE_12_parkingArea_2additionalparking_whatIsTheLengthOfAccessibleSpace2",
+        "NODE_10_parkingArea__isareTheSignsMountedOnAPoleOrWallWithTheBottomOfTheLowestSignAtLeast60AboveTheGround",
+        "NODE_1_parkingArea__isThereAnAutoAccessAisle5WideBy18LongcanBeSharedWithAnotherAccessibleSpace",
+        "NODE_2_pathOfTravel_5propertyline_doChangesInLevelMoreThan12HighHaveA5OrLowerSlopeifTheSlopeInQ7IsMoreThan5SurveyTheChangeInLevelUsingTheRampFormInSection6OfTheChecklist",
+        "NODE_62_2Curbramp_curbramp1_isThereATopLandingAMinimumOf48Long",
+        "NODE_2_pathOfTravel_5other_ifThereAreOverheadObstaclesLowerThan80FromTheGroundAlongThePathOfTravelAreThereBarriersToPreventSomeoneFromWalkingUnderneath",
+        "NODE_71_elevatorsLifts_3insidetheelevator_areTheVisualFloorPositionIndicatorsLocatedAboveTheControlPanelOrAboveTheElevatorDoor",
+        "NODE_72_elevatorsLifts_8wheelchairlifts_ifAWheelchairLiftIsUsedToChangeLevelsIsThereA60By60inchesLandingInFrontOfTheLiftDoorifTheLiftWasInstalledPriorTo1114IsThereManeuveringSpaceLargeEnoughForAPersonUsingA30inchesBy48inchesWheelchairToEnterOperateTheLi",
+        "NODE_61_1Ramps_ramp1_isThereAnIntermediateLandingForEach30RiseOfTheRampThatIsAtLeast60inchesLongAndAsWideAsTheRamp",
+        "NODE_12_parkingArea_2additionalparking_isThereAnAdditionalVanOrAutoAccessibleSpaceIfYesWhatIsTheWidth",
+        "NODE_2_pathOfTravel_4propertyline_isThePathOfTravelsidewalkAtLeast48Wideor36inchesAtAPointDueToNaturalBarriersOrOtherExistingConditions",
+        "NODE_61_1Ramps_ramp3_isThereALandingAtTheTopOfTheRampThatMeasures60WideBy60inchesLong",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_pullSideLanding32By60inches",
+        "NODE_2_pathOfTravel_3publictransportation_areAnyChangesInLevelFrom14To12inchesHighBeveled",
+        "NODE_2_pathOfTravel_3publictransportation_doAnyGratingsAlongThePathOfTravelHaveSpacesNoGreaterThan12WidthInTheDirectionOfTravel",
+        "NODE_32_2Hallways__in44WideHallwaysAreTherePassingSpaces60inchesBy60inchesOrtIntersectionsPlacedNotMoreThan200Apart",
+        "NODE_2_pathOfTravel_5other_doAllOjbectsMountedOnPollsProtrude12OrLessIntoThePathOfTravel",
+        "NODE_5_signage__doPermanentRoomsAndSpacesonlyThoseAreasIdentifiedForUseOnElectionDayHaveSignsWithRoomNamesOrNumbersInRaisedCharactersAndBraille",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_pushSideLevelLanding",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_32DoorWidthAt90Degrees",
+        "NODE_62_2Curbramp_curbramp2_isTheBottomLandingAMinimumOf48Long",
+        "NODE_2_pathOfTravel_5other_isThePathOfTravelsidewalkAtLeast48Wideor36inchesAtAPointDueToNaturalBarriersOrOtherExistingConditions",
+        "NODE_61_1Ramps_ramp1_isThereALandingAtTheBottomOfTheRampThatIs72LongAndAsWideAsTheRamp",
+        "NODE_61_1Ramps_ramp1_areTheHandrailEdgesRoundedAndReturnedToTheGroundWallOrPost",
+        "NODE_2_pathOfTravel_2parking_areAnyChangesInLevelFromToinchesHighBeveled",
+        "NODE_61_1Ramps_ramp3_isThereALandingAtTheBottomOfTheRampThatIs72LongAndAsWideAsTheRamp",
+        "NODE_71_elevatorsLifts_4controlpanel_areTheRaisedCharactersAtLeast58High",
+        "NODE_2_pathOfTravel_2parking_ifThereAreOverheadObstaclesLowerThan80FromTheGroundAlongThePathOfTravelAreThereCaneDetectableBarriersToPreventSomeoneFromWalkingUnderneath",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_ifTheDoorHasALatchCloser12OnThePushSideOfDoor",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_pushSideLanding32By48inches",
+        "NODE_61_1Ramps_ramp3_doesTheRampHaveContinuousHandrailsForTheFullLengthOfTheRampOnBothSidesexceptionAtExteriorDoorsWhenTheRampLandingAndTheDoorLandingOverlapARampDoesNotRequireHandrailsIfItIsLessThan6HighOr72inchesInLength",
+        "NODE_10_parkingArea__isTheAccessibleParkingSpaceOnTheShortestAccessibleRouteToAnAccessibleEntrance",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_32OnOneSideOfADoubleDoor",
+        "NODE_2_pathOfTravel_2publictransportation_isThePathOfTravelCrossslope2OrLess",
+        "NODE_2_pathOfTravel_2parking_isTheAlternatePathOfTravelMarkedWithDirectionalSignageIncludingAnIsa",
+        "NODE_2_pathOfTravel_3publictransportation_isThePathOfTravelsidewalkAtLeast48Wideor36inchesAtAPointDueToNaturalBarriersOrOtherExistingConditions",
+        "NODE_1_parkingArea__isTheAccessibleParkingSpaceOnTheShortestAccessibleRouteToAnAccessibleEntrance",
+        "NODE_71_elevatorsLifts_3insidetheelevator_areTheVisualFloorPositionIndicatorsAtLeastHigh",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_areThereRaisedCharacterAndBrailleSignsMountedOnBothSidesOfTheElevatorDoorjambWithTheLowestPartOfAnyBrailleCell48OrHigherAboveTheFloorAndTheBottomOfAnyTactileLetter60inchesMaximumAboveTheFloor",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_theLandingOrClearSpaceInFrontOfTheDoorOnThePushSideIsAtLeast32By48",
+        "NODE_61_1Ramps_ramp1_isTheSurfaceOfTheRampStableFirmAndSlipresistant",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_pullSideLanding32By60inches",
+        "NODE_2_pathOfTravel_6other_areAnyChangesInLevelFrom14To12inchesHighBeveled",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_hardware34To44inchesHigh",
+        "NODE_2_pathOfTravel_3publictransportation_ifThePathOfTravelToAnAccessibleEntranceIsNotTheRegularPedestrianRouteIsTheAlternateAcccessiblePathClearlyMarkedWithDirectionalSignage",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_thresholdHeightOrLess",
+        "NODE_2_pathOfTravel_3publictransportation_isTheAlternatePathOfTravelMarkedWithDirectionalSignageIncludingAnIsa",
+        "NODE_2_pathOfTravel_2parking_isThePredominatePathOfTravelToTheVotingAreaFreeOfSteps",
+        "NODE_62_2Curbramp_curbramp2_isTheBottomLandingSlopeNoMoreThan5OrLessInAllDirections",
+        "NODE_2_pathOfTravel_1parking_ifThereAreOverheadObstaclesLowerThan80FromTheGroundAlongThePathOfTravelAreThereCaneDetectableBarriersToPreventSomeoneFromWalkingUnderneath",
+        "NODE_10_parkingArea_0parkingmitigation_extendSpaceWithTape",
+        "NODE_34_4AdditionalHallway__areChangesInLevelFromToinchesHighBeveled",
+        "NODE_1_parkingArea__isTheParkingSpaceSlope2OrLessInAnyDirection",
+        "NODE_4_theVotingArea__isThereAClearFloorSpace60InDiameterOrATshapedSpacePresumedAvailableAfterVotingAreaIsSetUpToTurnAroundAndManeuverAWheelchair",
+        "NODE_32_2Hallways__doAllObjectsMountedOnPolesProtrude12OrLessIntoThePathOfTravel",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_doTheRaisedCharacterAndBrailleSignForTheMainFloorHaveARaisedStarSymbol",
+        "NODE_61_1Ramps_ramp1_doesTheRampHaveContinuousHandrailsForTheFullLengthOfTheRampOnBothSidesexceptionAtExteriorDoorsWhenTheRampLandingAndTheDoorLandingOverlapARampDoesNotRequireHandrailsIfItIsLessThan6HighOr72inchesInLength",
+        "NODE_61_1Ramps_ramp2_isTheIntermediateLandingLevelWithNoMoreThan2SlopeInAnyDirection",
+        "NODE_31_1Doorways__isTheLandingLevelWithNoMoreThan2SlopeInAnyDirection",
+        "NODE_2_pathOfTravel_5propertyline_ifNoToQuestion1IsThereAnAlternatePathOfTravelAvailableToTheVotingAreaThatIsFreeOfSteps",
+        "NODE_34_4AdditionalHallway_6additionalhallway_doAllObjectsMountedOnWallsProtrude4OrLessIntoThePathOfTravel",
+        "NODE_71_elevatorsLifts_2votingareaflooroutsidetheelevator_doesTheElevatorCarFloorStopWithinAboveOrBelowTheExteriorLanding",
+        "NODE_34_4AdditionalHallway__doAllInteriorHallwaysInThePathOfTravelHaveAStableFirmAndSlipresistantSurface",
+        "NODE_61_1Ramps_ramp2_isTheRampCrossslope2OrLess",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_32DoorWidthAt90Degrees",
+        "NODE_2_pathOfTravel_5other_ifThePathOfTravelToAnAccessibleEntranceIsNotTheRegularPedestrianRouteIsTheAlternateAcccessiblePathClearlyMarkedWithDirectionalSignage",
+        "NODE_2_pathOfTravel_4dropoffzone_ifThereAreOverheadObstaclesLowerThan80FromTheGroundAlongThePathOfTravelAreThereBarriersToPreventSomeoneFromWalkingUnderneath",
+        "NODE_61_1Ramps_ramp2_isThereALandingAtTheBottomOfTheRampThatIs72LongAndAsWideAsTheRamp",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_pullSideInteriorDoor18LatchSide",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_pullSideLevelLanding",
+        "NODE_11_parkingArea_1dropoffzone_isTheAccessAisleLevelWithASlopeNoHigherThan2InAnyDirection",
+        "NODE_2_pathOfTravel_1parking_isTheMainPathOfTravelToTheVotingAreaFreeOfSteps",
+        "NODE_61_1Ramps_ramp3_doCircularHandrailsHaveADiameterOf1To2inches",
+        "NODE_2_pathOfTravel_5propertyline_doAnyGratingsAlongThePathOfTravelHaveSpacesNoGreaterThan12WidthInTheDirectionOfTravel",
+        "NODE_2_pathOfTravel_4dropoffzone_doAnyGratingsAlongThePathOfTravelHaveSpacesNoGreaterThan12WidthInTheDirectionOfTravel",
+        "NODE_2_pathOfTravel_5other_areAnyChangesInLevelFrom14To12inchesHighBeveled",
+        "NODE_34_4AdditionalHallway__in44WideHallwaysAreTherePassingSpaces60inchesBy60inchesOrtIntersectionsPlacedNotMoreThan200Apart",
+        "NODE_61_1Ramps_ramp1_ifTheHandrailsAreLocatedAdjacentToAWallIsTheGapBetweenTheHandrailAndTheWallAtLeast1",
+        "NODE_2_pathOfTravel_2publictransportation_areAnyChangesInLevelFromToinchesHighBeveled",
+        "NODE_31_1Doorways__onThePullSideOfTheDoorIsTheDoorLanding32WideAndAtLeast60DeepPerpendicularToTheDoor",
+        "NODE_2_pathOfTravel_6otherpathmitigation_directionalSignageNeededForSiteSetup",
+        "NODE_2_pathOfTravel_1parking_areAnyChangesInLevelFromToinchesHighBeveled",
+        "NODE_71_elevatorsLifts_4controlpanel_areRaisedCharactersAndBrailleUsedToIdentifyEachFloorButtonAndEachControlInsideTheElevatorCab",
+        "NODE_61_1Ramps_ramp1_doCircularHandrailsHaveADiameterOf1To2inches",
+        "NODE_12_parkingArea_2additionalparking_theLowestPartOfTheBottomSignIs60MinimumAboveTheGround",
+        "NODE_4_theVotingArea__isThereAStableFirmAndSlipresistantPathOfTravelInsideTheVotingArea",
+        "NODE_31_1Doorways__isThereASmoothUninterruptedSurfaceAMinimumOf10HighMeasuredFromTheFloorOnThePushSideOfTheDoor",
+        "NODE_2_pathOfTravel_5propertyline_isTheAlternatePathOfTravelMarkedWithDirectionalSignageIncludingAnIsa",
+        "NODE_62_2Curbramp_curbramp2_isTheCurbrampAtLeast48Wide",
+        "NODE_34_4AdditionalHallway__doAllObjectsMountedOnPolesProtrude12OrLessIntoThePathOfTravel",
+        "NODE_71_elevatorsLifts_4controlpanel_isThereA1MinimumGapBetweenTheHandrailAndTheWall",
+        "NODE_2_pathOfTravel_2parking_doAnyGratingsAlongThePathOfTravelHaveSpacesNoGreaterThanWideInTheDirectionOfTravel",
+        "NODE_61_1Ramps_ramp1_doNoncircularHandrailsHaveAPerimeterOf4MinimumAnd6inchesMaximumAndACrossSectionDimensionOf2inchesMaximum",
+        "NODE_61_1Ramps_ramp2_isTheTopLandingLevelWithNoMoreThan2SlopeInAnyDirection",
+        "NODE_2_pathOfTravel_4propertyline_ifThePathOfTravelToAnAccessibleEntranceIsNotTheRegularPedestrianRouteIsTheAlternateAcccessiblePathClearlyMarkedWithDirectionalSignage",
+        "NODE_62_2Curbramp_curbramp3_isTheBottomLandingAMinimumOf48Long",
+        "NODE_71_elevatorsLifts_5emergencycontrols_areTheLowestOperableControlButtonsForEmergencyControlsAtLeast35AboveTheCarFloor",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_24OnThePullSideOfExteriorDoor",
+        "NODE_2_pathOfTravel_5propertyline_areAnyChangesInLevelFrom14To12inchesHighBeveled",
+        "NODE_32_2Hallways__doChangesInLevelMoreThanHighHaveA5OrLowerSlope",
+        "NODE_33_3AdditionalDoors_4additionaldoor4_hardware34To44inchesHigh",
+        "NODE_72_elevatorsLifts_7wheelchairlifts_doesTheLiftAllowAWheelchairUserUnassistedEntryOperationAndExit",
+        "NODE_61_1Ramps_ramp1_isTheTopLandingLevelWithNoMoreThan2SlopeInAnyDirection",
+        "NODE_4_theVotingArea__ifThereAreChangesInLevelFrom14To12inchesOnTheLieklyPathOfTravelInTheVotingAreaAreThoseChangesInLevelBeveled",
+        "NODE_61_1Ramps_ramp1_rampLocation",
+        "NODE_11_parkingArea_1dropoffzone_isTheVehiclePullUpSpaceLevelWithASlopeNoHigherThan2InAnyDirection",
+        "NODE_61_1Ramps_ramp1_ifRequiredAreTheHandrailsMountedBetween34To38inchesAboveTheRampSurface",
+        "NODE_61_1Ramps_ramp3_whereTheRampOrLandingHasAVerticalDropoffOnEitherSideAreWheelGuidesOrRaisedCurbsatLeast2HighProvided",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_32OnOneSideOfADoubleDoor",
+        "NODE_4_theVotingArea_mitigation_needToModifyHazards",
+        "NODE_12_parkingArea_2additionalparking_whatIsTheAccessibleSpace2Slope",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_32OnOneSideOfADoubleDoor",
+        "NODE_10_parkingArea_0parkingmitigation_needConesignToIdentifyAccessibleSpace",
+        "NODE_71_elevatorsLifts_2votingareaflooroutsidetheelevator_isTheGapBetweenTheElevatorCarAndTheLandingNotMoreThan1Wide",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_doorPressure5LbfOrLess",
+        "NODE_61_1Ramps_ramp2_doesTheRampHaveHandrailsOnBothSidesOfTheRamp",
+        "NODE_2_pathOfTravel_6other_doChangesInLevelMoreThan12HighHaveA5OrLowerSlopeifTheSlopeInQ7IsMoreThan5SurveyTheChangeInLevelUsingTheRampFormInSection6OfTheChecklist",
+        "NODE_72_elevatorsLifts_8wheelchairlifts_doesTheLiftHaveStandbyPowerInCaseOfAnEmergencyThatWillAllowTheLiftToOperate5UpAndDownTrips",
+        "NODE_2_pathOfTravel_2parking_ifThePathOfTravelToAnAccessibleEntranceIsNotTheRegularPedestrianRouteIsTheAlternateAcccessiblePathClearlyMarkedWithDirectionalSignage",
+        "NODE_62_2Curbramp_curbramp2_isTheCrossslope2OrLess",
+        "NODE_33_3AdditionalDoors_4additionaldoor4_beveledThresholdAndinches",
+        "NODE_32_2Hallways__areChangesInLevelFromToinchesHighBeveled",
+        "NODE_62_2Curbramp_curbramp3_isTheTopLandingSlopeNoMoreThan2InAnyDirection",
+        "NODE_71_elevatorsLifts_2votingareaflooroutsidetheelevator_areThereRaisedCharacterAndBrailleSignsMountedOnBothSidesOfTheElevatorDoorjambWithTheLowestPartOfAnyBrailleCell48OrHigherAboveTheFloorAndTheBottomOfAnyTactileLetter60inchesMaximumAboveTheFloor",
+        "NODE_31_1Doorways__ifDoubleDoorsIsThereAtLeast32OfClearWidthOnOneDoor",
+        "NODE_31_1Doorways__isTheDoorThresholdBeveledBetweenAndinches",
+        "NODE_72_elevatorsLifts_7wheelchairlifts_areTheWheelchairLiftControlsUsableWithOneHandWithoutTightGraspingPinchingOrTwistingOfTheWrist",
+        "NODE_2_pathOfTravel_3publictransportation_ifThereAreOverheadObstaclesLowerThan80FromTheGroundAlongThePathOfTravelAreThereBarriersToPreventSomeoneFromWalkingUnderneath",
+        "NODE_1_parkingArea__isThereAParkingLotOnTheProperty",
+        "NODE_2_pathOfTravel_1parking_ifThePathOfTravelToAnAccessibleEntranceIsNotTheRegularPedestrianRouteIsTheAlternateAcccessiblePathClearlyMarkedWithDirectionalSignage",
+        "NODE_71_elevatorsLifts_2votingareaflooroutsidetheelevator_areTheRaisedCharactersOnTheDoorjambSignsAtLeast2High",
+        "NODE_61_1Ramps_ramp2_isTheSurfaceOfTheRampStableFirmAndSlipresistant",
+        "NODE_32_2Hallways_1mitigationforhallways_relocateMovableObjectsOutOfAccessiblePathOfTravel",
+        "NODE_12_parkingArea_2additionalparking_whatIsTheLengthOfAccessibleAisle2",
+        "NODE_12_parkingArea_2additionalparking_whatIsTheLengthOfAccessibleSpace1",
+        "NODE_2_pathOfTravel_2publictransportation_doAllObjectsMountedOnWallsProtrude4OrLessIntoThePathOfTravel",
+        "NODE_2_pathOfTravel_3dropoffzone_isThePathOfTravelCrossslope2OrLess",
+        "NODE_2_pathOfTravel_2publictransportation_ifThereAreOverheadObstaclesLowerThan80FromTheGroundAlongThePathOfTravelAreThereCaneDetectableBarriersToPreventSomeoneFromWalkingUnderneath",
+        "NODE_10_parkingArea__forVanAccessibleParkingSpacesAreTheWordsvanAccessibleAddedBelowTheIsa",
+        "NODE_34_4AdditionalHallway_6additionalhallway_doesThePathOfTravelHaveACrossSlopeThatIs2OrLess",
+        "NODE_34_4AdditionalHallway__doesThePathOfTravelHaveACrossSlopeThatIs2OrLess",
+        "NODE_32_2Hallways__isThereAnAccessiblePathOfTravelFromTheEntranceToTheVotingAreaThatIsFreeOfSteps",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_pullSideExteriorDoor24LatchSide",
+        "NODE_2_pathOfTravel_1parking_doAllObjectsMountedOnWallsProtrude4OrLessIntoThePathOfTravel",
+        "NODE_12_parkingArea_2additionalparking_wheelingOrWalkingBehindCarsOtherThanYourOwnIsNotRequired",
+        "NODE_2_pathOfTravel_2publictransportation_doChangesInLevelMoreThanHighHaveA5OrLowerSlope",
+        "NODE_34_4AdditionalHallway__areHallwaysAndCorridorsInThePathOfTravelAtLeast44Wide",
+        "NODE_61_1Ramps_ramp1_doTheHandrailsExtend12HorizontallyOverEachLanding",
+        "NODE_2_pathOfTravel_6other_doAllOjbectsMountedOnPollsProtrude12OrLessIntoThePathOfTravel",
+        "NODE_62_2Curbramp_curbramp1_isTheBottomLandingSlopeNoMoreThan5OrLessInAllDirections",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_whenTheElevatorDoorReopensDoesItStayOpenAtLeast20SecondsToAllowSlowerMovingVotersToCompletelyEnterOrExitTheCar",
+        "NODE_71_elevatorsLifts_3insidetheelevator_isTheElevatorEquippedWithVisualFloorPositionIndicatorsThatLightUpWhenTheCarStopsOrPassesEachFloor",
+        "NODE_61_1Ramps_ramp2_isThereA60WideBy72inchesLongIntermediateLandingWhereverTheRampChangesDirection",
+        "NODE_71_elevatorsLifts_6cardimensions_doesTheOlderElevatorComplyWithAllOtherRequirementsOfThisSection",
+        "NODE_62_2Curbramp_curbramp3_doesTheCurbrampHaveEitherWheelGuidesOrSideFlares",
+        "NODE_33_3AdditionalDoors_4additionaldoor4_32OnOneSideOfADoubleDoor",
+        "NODE_2_pathOfTravel_4propertyline_doChangesInLevelMoreThan12HighHaveA5OrLowerSlopeifTheSlopeInQ7IsMoreThan5SurveyTheChangeInLevelUsingTheRampFormInSection6OfTheChecklist",
+        "NODE_2_pathOfTravel_5propertyline_doAllOjbectsMountedOnPollsProtrude12OrLessIntoThePathOfTravel",
+        "NODE_34_4AdditionalHallway__doChangesInLevelMoreThanHighHaveA5OrLowerSlope",
+        "NODE_34_4AdditionalHallway__doAllObjectsMountedOnWallsProtrude4OrLessIntoThePathOfTravel",
+        "NODE_71_elevatorsLifts_2votingareaflooroutsidetheelevator_isThePathOfTravelFromTheElevatorToTheVotingAreaAccessible",
+        "NODE_61_1Ramps_ramp2_isTheBottomLandingLevelWithNoMoreThan2SlopeInAnyDirection",
+        "NODE_62_2Curbramp_curbramp2_isTheSurfaceOfTheCurbrampStableFirmAndSlipresistant",
+        "NODE_2_pathOfTravel_1parking_doChangesInLevelMoreThanHighHaveA5OrLowerSlope",
+        "NODE_12_parkingArea_2additionalparking_whatIsTheWidthOfAccessibleAisle1",
+        "NODE_4_theVotingArea__ifThereAreChangesInLevelHigherThan12OnTheLikelyPathOfTravelInTheVotingAreaDoThoseChangesInLevelHaveA5OrLowerSlope",
+        "NODE_61_1Ramps_ramp2_areTheHandrailEdgesRoundedAndReturnedToTheGroundWallOrPost",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_pushSideWithLatchCloser12LatchSide",
+        "NODE_2_pathOfTravel_4dropoffzone_isThePathOfTravelsidewalkAtLeast48Wideor36inchesAtAPointDueToNaturalBarriersOrOtherExistingConditions",
+        "NODE_61_1Ramps_ramp3_isThereA60WideBy72inchesLongIntermediateLandingWhereverTheRampChangesDirection",
+        "NODE_61_1Ramps_ramp2_doNoncircularHandrailsHaveAPerimeterOf4MinimumAnd6inchesMaximumAndACrossSectionDimensionOf2inchesMaximum",
+        "NODE_33_3AdditionalDoors_4additionaldoor4_doorPressure5LbfOrLess",
+        "NODE_62_2Curbramp_curbramp3_isTheCrossslope2OrLess",
+        "NODE_2_pathOfTravel_4propertyline_doAllObjectsMountedOnWallsProtrude4OrLessIntoThePathOfTravelforQ910SurveyObjectsBetween27inchesAnd80inchesHigh",
+        "NODE_61_1Ramps_ramp3_doesTheRampHaveHandrailsOnBothSidesOfTheRamp",
+        "NODE_2_pathOfTravel_5propertyline_isTheSurfaceOfThePathOfTravelStableFirmAndSlipresistant",
+        "NODE_34_4AdditionalHallway_6additionalhallway_ifThereAreOverheadObstaclesLowerThan80AboveTheFloorAlongThePathOfTravelAreThereCaneDetectableBarriersToPreventSomeoneFromWalkingUnderneath",
+        "NODE_2_pathOfTravel_4dropoffzone_doChangesInLevelMoreThan12HighHaveA5OrLowerSlopeifTheSlopeInQ7IsMoreThan5SurveyTheChangeInLevelUsingTheRampFormInSection6OfTheChecklist",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_isThereA30By48inchesClearSpaceInFrontOfTheHallCallButtonsThatAllowsAFrontOrParallelApproach",
+        "NODE_32_2Hallways__doesThePathOfTravelHaveACrossSlopeThatIs2OrLess",
+        "NODE_61_1Ramps_ramp1_isThereALandingAtTheTopOfTheRampThatMeasures60WideBy60inchesLong",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_areTheHallCallButtonsRaisedAboveTheirSurroundingSurface",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_theLandingOrClearSpaceInFrontOfTheDoorOnThePushSideIsAtLeast32By48",
+        "NODE_2_pathOfTravel_1parking_ifNoToQuestion1IsThereAnAlternatePathOfTravelAvailableToTheVotingAreaThatIsFreeOfSteps",
+        "NODE_62_2Curbramp_curbramp1_isTheSurfaceOfTheCurbrampStableFirmAndSlipresistant",
+        "NODE_61_1Ramps_ramp2_ifTheHandrailsAreLocatedAdjacentToAWallIsTheGapBetweenTheHandrailAndTheWallAtLeast1",
+        "NODE_1_parkingArea__isareTheSignsMountedOnAPoleOrWallWithTheBottomOfTheLowestSignAtLeast60AboveTheGround",
+        "NODE_61_1Ramps_ramp2_doCircularHandrailsHaveADiameterOf1To2inches",
+        "NODE_31_1Doorways__ifTheDoorHasALatchAndCloserIsThereAtLeast12OfStrikesideClearSpaceOnThePushSideOfTheDoor",
+        "NODE_1_parkingArea__ifTheSignsAreMountedInThePathOfTravelIsTheBottomEdgeOfTheSign80OrHigher",
+        "NODE_61_1Ramps_ramp2_ifRequiredAreTheHandrailsMountedBetween34To38inchesAboveTheRampSurface",
+        "NODE_10_parkingArea_0parkingmitigation_widenAccessAisleWithTapeOrCones",
+        "NODE_12_parkingArea_2additionalparkingmitigation_needConesignToIdentifyAccessibleSpace",
+        "NODE_11_parkingArea_1dropoffzone_isThereA5WideAccessAisleForTheFullLengthOfTheDropOffZoneToAllowVotersToExitAVehicleOrWaitForPickUp20FeetLongForDropoffZonesConstructedPriorTo112014",
+        "NODE_2_pathOfTravel_3dropoffzone_doAnyGratingsAlongThePathOfTravelHaveSpacesNoGreaterThanWideInTheDirectionOfTravel",
+        "NODE_2_pathOfTravel_2parking_isThePathOfTravelsidewalkAtLeast48Wideor36inchesAtAPointDueToNaturalBarriersOrOtherExistingConditions",
+        "NODE_71_elevatorsLifts_6cardimensions_ifTheElevatorHasASideOpeningDoorIsTheInsideAtLeast68Wide",
+        "NODE_2_pathOfTravel_3dropoffzone_ifThereAreOverheadObstaclesLowerThan80FromTheGroundAlongThePathOfTravelAreThereCaneDetectableBarriersToPreventSomeoneFromWalkingUnderneath",
+        "NODE_2_pathOfTravel_2publictransportation_doAllObjectsMountedOnPolesProtrude12OrLessIntoThePathOfTravel",
+        "NODE_2_pathOfTravel_3publictransportation_isThePredominatePathOfTravelToTheVotingAreaFreeOfSteps",
+        "NODE_2_pathOfTravel_4dropoffzone_isThePredominatePathOfTravelToTheVotingAreaFreeOfSteps",
+        "NODE_32_2Hallways__areHallwaysAndCorridorsInThePathOfTravelAtLeast44Wide",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_areThereTwoVisualSignalsAtLeast2WideBy2inchesHighPlacedAtLeast6AboveTheFloorThatLightUpShowingTheArrivalAndDirectionOfTheCar",
+        "NODE_2_pathOfTravel_4propertyline_areAnyChangesInLevelFrom14To12inchesHighBeveled",
+        "NODE_1_parkingArea_0parkingmitigation_needConesignToIdentifyAccessibleSpace",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_ifTheClearSpaceInFrontOfTheHallCallButtonsHasOnlyAFrontApproachIsItClearOfAnyObstructionOrIfOnlyASideApproachIsTheClearSpaceFreeFromObjectsThatProjectOutFromTheWallMoreThan10",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_doesTheElevatorCarFloorStopWithinAboveOrBelowTheExteriorLanding",
+        "NODE_61_1Ramps_ramp1_isTheSlopeOfTheRamp833OrLess",
+        "NODE_62_2Curbramp_curbramp1_isTheCrossslope2OrLess",
+        "NODE_12_parkingArea_2additionalparking_isaSignInFrontOfAccessibleParkingSpace",
+        "NODE_61_1Ramps_ramp2_whereTheRampOrLandingHasAVerticalDropoffOnEitherSideAreWheelGuidesOrRaisedCurbsatLeast2HighProvided",
+        "NODE_2_pathOfTravel_2publictransportation_isThePathOfTravelsidewalkAtLeast48Wideor36inchesAtAPointDueToNaturalBarriersOrOtherExistingConditions",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_accessibleDoorHardware",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_ifTheDoorHasALatchCloser12OnThePushSideOfDoor",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_areTheRaisedCharactersOnTheDoorjambSignsAtLeast2High",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_ifTheDoorHasALatchCloser12OnThePushSideOfDoor",
+        "NODE_61_1Ramps_ramp1_isTheIntermediateLandingLevelWithNoMoreThan2SlopeInAnyDirection",
+        "NODE_61_1Ramps_ramp2_isThereA60LongIntermediateLandingForEach30inchesRiseOfTheRamp",
+        "NODE_33_3AdditionalDoors_4additionaldoor4_ifTheDoorHasALatchCloser12OnThePushSideOfDoor",
+        "NODE_2_pathOfTravel_2publictransportation_isTheSurfaceOfThePathOfTravelStableFirmAndSlipresistant",
+        "NODE_2_pathOfTravel_1parking_isThePathOfTravelsidewalkAtLeast48Wideor36inchesAtAPointDueToNaturalBarriersOrOtherExistingConditions",
+        "NODE_61_1Ramps_ramp1_areTheHandrailsRoundedAndReturnedToTheGroundWallOrPost",
+        "NODE_62_2Curbramp_curbramp3_isThereATopLandingAMinimumOf48Long",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_pushSideLanding32By48inches",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_pushSideWithLatchCloser12LatchSide",
+        "NODE_1_parkingArea__ifCoveredParkingIsProvidedIsThereVerticalClearanceOfAtLeast82ForTheVehicleRouteFromTheEntranceToTheAccessibleSpacesAndAlongTheVehicleRouteToTheExit",
+        "NODE_61_1Ramps_ramp3_ifRequiredAreTheHandrailsMountedBetween34To38inchesAboveTheRampSurface",
+        "NODE_33_3AdditionalDoors_4additionaldoor4_theLandingOrClearSpaceInFrontOfTheDoorOnThePullSideIsAtLeast32By60",
+        "NODE_62_2Curbramp_curbramp2_isThereA12WideGroovedBorderCutIntoTheWalkwaySurfaceAlongTheTopAndSidesOfTheCurbramp",
+        "NODE_34_4AdditionalHallway__ifThereAreOverheadObstaclesLowerThan80AboveTheFloorAlongThePathOfTravelAreThereCaneDetectableBarriersToPreventSomeoneFromWalkingUnderneath",
+        "NODE_11_parkingArea_1dropoffzone_isThereA5WideAccessAisleForTheFullLengthOfTheDropOffZoneToAllowVotersToExitAVehicleOrWaitForPickUp",
+        "NODE_61_1Ramps_ramp1_isThereA60WideBy72inchesLongIntermediateLandingWhereverTheRampChangesDirection",
+        "NODE_33_3AdditionalDoors_2mitigationadditionaldoor2_propDoorOpen",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_pullSideInteriorDoor18LatchSide",
+        "NODE_2_pathOfTravel_6other_doAllObjectsMountedOnWallsProtrude4OrLessIntoThePathOfTravelforQ910SurveyObjectsBetween27inchesAnd80inchesHigh",
+        "NODE_1_parkingArea__isThereAVanAccessibleAccessAisle8WideBy18LongLocatedOnThePassengerSideOfTheSpacecanBeSharedWithAnAutoAccessibleSpace",
+        "NODE_62_2Curbramp_curbramp1_isTheCurbrampAtLeast48Wide",
+        "NODE_12_parkingArea_2additionalparking_stableFirmAndSlipresistantSurface",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_isTheGapBetweenTheElevatorCarAndTheLandingNotMoreThan1Wide",
+        "NODE_12_parkingArea_2additionalparking_whatIsTheAccessibleSpace1Slope",
+        "NODE_1_parkingArea__areThereSufficientNumberOfAutoAccessibleParkingSpacesForTheSizeOfParkingLot",
+        "NODE_12_parkingArea_2additionalparking_inThePathOfTravelTheBottomOfTheLowestSignIs80MinimumAboveTheGround",
+        "NODE_62_2Curbramp_curbramp2_isTheTopLandingSlopeNoMoreThan2InAnyDirection",
+        "NODE_32_2Hallways__ifThereAreOverheadObstaclesLowerThan80AboveTheFloorAlongThePathOfTravelAreThereCaneDetectableBarriersToPreventSomeoneFromWalkingUnderneath",
+        "NODE_2_pathOfTravel_2publictransportation_isTheMainPathOfTravelToTheVotingAreaFreeOfSteps",
+        "NODE_12_parkingArea_2additionalparking_accessibleSpaceIsOnTheShortestAccessibleRouteToAnAccessibleEntrance",
+        "NODE_2_pathOfTravel_4propertyline_doAnyGratingsAlongThePathOfTravelHaveSpacesNoGreaterThan12WidthInTheDirectionOfTravel",
+        "NODE_72_elevatorsLifts_8wheelchairlifts_isTheLiftOperableOnTheDayOfTheSurvey",
+        "NODE_2_pathOfTravel_6other_isThePredominatePathOfTravelToTheVotingAreaFreeOfSteps",
+        "NODE_71_elevatorsLifts_4controlpanel_isTheCorrespondingBrailleLocatedBelowTheRaisedCharacters",
+        "NODE_61_1Ramps_ramp1_doHandrailsProtrudeNoMoreThan4IntoPathOfTravel",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_pushSideLevelLanding",
+        "NODE_34_4AdditionalHallway__isThereAnAccessiblePathOfTravelFromTheEntranceToTheVotingAreaThatIsFreeOfSteps",
+        "NODE_33_3AdditionalDoors_1additionaldoor1_pullSideLevelLanding",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_pushSideLevelLanding",
+        "NODE_2_pathOfTravel_1parking_isTheAlternatePathOfTravelMarkedWithDirectionalSignageIncludingAnIsa",
+        "NODE_31_1Doorways__isTheOperablePartOfTheDoorHardwareMountedBetween34And44inchesAboveTheFloor",
+        "NODE_1_parkingArea__isTheParkingSpaceSurfaceStableFirmAndSlipresistant",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_hardware34To44inchesHigh",
+        "NODE_71_elevatorsLifts_1mainentryflooroutsidetheelevator_isTheElevatorDoorwayAtLeast36Wide",
+        "NODE_2_pathOfTravel_4propertyline_ifThereAreOverheadObstaclesLowerThan80FromTheGroundAlongThePathOfTravelAreThereBarriersToPreventSomeoneFromWalkingUnderneath",
+        "NODE_32_2Hallways__doAllInteriorHallwaysInThePathOfTravelHaveAStableFirmAndSlipresistantSurface",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_18OnThePullSideOfInteriorDoor",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_doorPressure5LbfOrLess",
+        "NODE_61_1Ramps_ramp1_doesTheRampHaveHandrailsOnBothSidesOfTheRamp",
+        "NODE_4_theVotingArea_mitigation_movableItems",
+        "NODE_12_parkingArea_2additionalparking_whatIsTheWidthOfAccessibleAisle2",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_pushSideWithLatchCloser12LatchSide",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_24OnThePullSideOfExteriorDoor",
+        "NODE_2_pathOfTravel_6other_ifThePathOfTravelToAnAccessibleEntranceIsNotTheRegularPedestrianRouteIsTheAlternateAcccessiblePathClearlyMarkedWithDirectionalSignage",
+        "NODE_2_pathOfTravel_3publictransportation_doAllObjectsMountedOnWallsProtrude4OrLessIntoThePathOfTravelforQ910SurveyObjectsBetween27inchesAnd80inchesHigh",
+        "NODE_10_parkingArea_0parkingmitigation_coneOffSpace",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_thresholdHeightOrLess",
+        "NODE_61_1Ramps_ramp2_isTheSlopeOfTheRamp833OrLess",
+        "NODE_72_elevatorsLifts_8wheelchairlifts_ifTheLiftEntryDoorHasAFrontApproachIsTheDoorClearSpaceAtLeast32Wide",
+        "NODE_2_pathOfTravel_3dropoffzone_isThePathOfTravelsidewalkAtLeast48Wideor36inchesAtAPointDueToNaturalBarriersOrOtherExistingConditions",
+        "NODE_34_4AdditionalHallway_6additionalhallway_doAllObjectsMountedOnPolesProtrude12OrLessIntoThePathOfTravel",
+        "NODE_71_elevatorsLifts_4controlpanel_doControlButtonsLightUpWhenActivatedAndGoOutWhenTheElevatorCompletesTheRequestedAction",
+        "NODE_62_2Curbramp_curbramp2_isThereATopLandingAMinimumOf48Long",
+        "NODE_34_4AdditionalHallway_6additionalhallway_areHallwaysAndCorridorsInThePathOfTravelAtLeast44Wide",
+        "NODE_32_2Hallways_1mitigationforhallways_thresholdRampsNeededForSmallChangeInLevel",
+        "NODE_31_1Doorways__onThePushSideOfTheDoorIsTheDoorLanding32WideAndAtLeast48DeepPerpendicularToTheDoor",
+        "NODE_71_elevatorsLifts_4controlpanel_isThereAHandrailInsideTheCarOnAtLeastOneWallThatIs31To33inchesAboveTheFloor",
+        "NODE_2_pathOfTravel_3publictransportation_isTheSurfaceOfThePathOfTravelStableFirmAndSlipresistant",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_hardware34To44inchesHigh",
+        "NODE_2_pathOfTravel_5propertyline_ifThePathOfTravelToAnAccessibleEntranceIsNotTheRegularPedestrianRouteIsTheAlternateAcccessiblePathClearlyMarkedWithDirectionalSignage",
+        "NODE_2_pathOfTravel_5propertyline_isThePredominatePathOfTravelToTheVotingAreaFreeOfSteps",
+        "NODE_62_2Curbramp_curbramp3_isTheBottomLandingSlopeNoMoreThan5OrLessInAllDirections",
+        "NODE_61_1Ramps_ramp1_whereTheRampOrLandingHasAVerticalDropoffOnEitherSideAreWheelGuidesOrRaisedCurbsatLeast2HighProvided",
+        "NODE_2_pathOfTravel_3dropoffzone_doAllObjectsMountedOnPolesProtrude12OrLessIntoThePathOfTravel",
+        "NODE_2_pathOfTravel_3dropoffzone_isTheMainPathOfTravelToTheVotingAreaFreeOfSteps",
+        "NODE_33_3AdditionalDoors_4additionaldoor4_theLandingOrClearSpaceInFrontOfTheDoorOnThePushSideIsAtLeast32By48",
+        "NODE_4_theVotingArea__doAllObjectsMountedOnWallsProtrude4OrLessIntoThePathOfTravelForQ23OnlySurveyObjectsBetween27inchesAnd80inchesHighThatAreInPathTravel",
+        "NODE_4_theVotingArea__doAllPortionsOfTheLikelyPathOfTravelInTheVotingAreaHaveACrossslopeThatIs2OrLess",
+        "NODE_1_parkingArea__forVanAccessibleParkingSpacesAreTheWordsvanAccessibleAddedBelowTheIsa",
+        "NODE_2_pathOfTravel_5other_isTheMainPathOfTravelToTheVotingAreaFreeOfSteps",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_thresholdHeightOrLess",
+        "NODE_12_parkingArea_2additionalparking_whatIsTheLengthOfAccessibleAisle1",
+        "NODE_61_1Ramps_ramp3_areTheHandrailsRoundedAndReturnedToTheGroundWallOrPost",
+        "NODE_11_parkingArea_1dropoffzone_isTheAccessAisleMarkedWithABorderLineAndHatchedLinesInAContrastingColor",
+        "NODE_4_theVotingArea__inTheEventOfAnEmergencyDoAllEmergencyMarkedDoorsHaveAccessibleHardwareThatDoesNotRequireGraspingOrPinchingOfTheWrist",
+        "NODE_2_pathOfTravel_2parking_doAllObjectsMountedOnWallsProtrude4OrLessIntoThePathOfTravel",
+        "NODE_2_pathOfTravel_3dropoffzone_isTheSurfaceOfThePathOfTravelStableFirmAndSlipresistant",
+        "NODE_2_pathOfTravel_4dropoffzone_doAllObjectsMountedOnWallsProtrude4OrLessIntoThePathOfTravelforQ910SurveyObjectsBetween27inchesAnd80inchesHigh",
+        "NODE_62_2Curbramp_curbramp1_isThereA12WideGroovedBorderCutIntoTheWalkwaySurfaceAlongTheTopAndSidesOfTheCurbramp",
+        "NODE_2_pathOfTravel_3dropoffzone_areAnyChangesInLevelFromToinchesHighBeveled",
+        "NODE_2_pathOfTravel_4dropoffzone_areAnyChangesInLevelFrom14To12inchesHighBeveled",
+        "NODE_33_3AdditionalDoors_3additionaldoor3_theLandingOrClearSpaceInFrontOfTheDoorOnThePullSideIsAtLeast32By60",
+        "NODE_1_parkingArea_0parkingmitigation_coneOffAisle",
+        "NODE_33_3AdditionalDoors_2additionaldoor2_doorPressure5LbfOrLess",
+        "NODE_61_1Ramps_ramp1_isThereA60LongIntermediateLandingForEach30inchesRiseOfTheRamp",
+        "NODE_2_pathOfTravel_4propertyline_isTheSurfaceOfThePathOfTravelStableFirmAndSlipresistant",
+        "NODE_62_2Curbramp_curbramp1_isTheMaximumSlopeOfTheCurbrampNoMoreThan833",
+        "NODE_2_pathOfTravel_4dropoffzone_doAllOjbectsMountedOnPollsProtrude12OrLessIntoThePathOfTravel",
+        "NODE_2_pathOfTravel_5other_isTheSurfaceOfThePathOfTravelStableFirmAndSlipresistant"
+    ];
+
+    var locale = "en_US";
+    var labels;
+    var localizer = {
+        "getLocalizedLabel": function (id, label) {
+            if (labels.hasOwnProperty(id) && labels[id].hasOwnProperty(label)) {
+                return labels[id][label];
+            } else {
+                console.warn("no localized label defined for (" + label + ") in group (" + id + ")");
+                console.error("\"" + label + "\": \"XX\",");
+                return "XX-" + label + "-XX";
+            }
+        },
+        "getSemanticLocalizedLabel": function (id, label) {
+            if (labels.hasOwnProperty(id) && labels[id].hasOwnProperty("P_" + label)) {
+                return labels[id]["P_" + label];
+            } else {
+                console.warn("no localized label defined for (" + "P_" + label + ") in group (" + id + ")");
+                console.error("\"" + "P_" + label + "\": \"XX\",");
+                return "XX-" + "P_" + label + "-XX";
+            }
+        }
+    };
+
+    d3.select("#language").on("change", function () {
+        var selectedLocale = this.options[this.selectedIndex].value;
+        // Load localized labels
+
+        d3.json("locale/" + selectedLocale + ".json", function (error, localizedLabels) {
+            labels = localizedLabels;
+
+            popoto.queryviewer.QUERY_STARTER = labels.query_find;
+            popoto.queryviewer.CHOOSE_LABEL = labels.query_choose;
+            popoto.graph.TOOL_TAXONOMY = labels.tool_taxonomy;
+            popoto.graph.TOOL_CENTER = labels.tool_center;
+            popoto.graph.TOOL_FULL_SCREEN = labels.tool_full_screen;
+
+            // Recreate taxonomies panel
+            d3.select("#" + popoto.taxonomy.containerId).selectAll("ul").data([]).exit().remove();
+            popoto.taxonomy.createTaxonomyPanel();
+
+            d3.select("#credit").html(labels.credit);
+            d3.select("#tips").html(labels.tips);
+            d3.select("#results").text(labels.results);
+            d3.select("#reschooser").text(labels.reschooser);
+            d3.select("#langlabel").text(labels.langlabel);
+            d3.select("#popoto-taxonomy-menu").attr("title", popoto.graph.TOOL_TAXONOMY);
+            d3.select("#popoto-center-menu").attr("title", popoto.graph.TOOL_CENTER);
+            d3.select("#popoto-fullscreen-menu").attr("title", popoto.graph.TOOL_FULL_SCREEN);
+
+            popoto.result.hasChanged = true; // used to update localized attribute in results
+            popoto.update();
+        });
+    });
+
+    d3.select("#style").on("change", function () {
+        var selectedStyle = this.options[this.selectedIndex].value;
+
+        if (selectedStyle == "neo4j") {
+            popoto.graph.node.ELLIPSE_RX = 40;
+            popoto.graph.node.ELLIPSE_RY = 40;
+            popoto.graph.node.TEXT_Y = 6;
+            popoto.graph.LINK_DISTANCE = 100;
+            popoto.graph.node.NODE_MAX_CHARS = 13;
+            popoto.graph.node.BACK_CIRCLE_R = 48
+        } else {
+            popoto.graph.node.ELLIPSE_RX = 50;
+            popoto.graph.node.ELLIPSE_RY = 25;
+            popoto.graph.node.TEXT_Y = 8;
+            popoto.graph.LINK_DISTANCE = 150;
+            popoto.graph.node.NODE_MAX_CHARS = 11;
+            popoto.graph.node.BACK_CIRCLE_R = 70;
+        }
+
+        selectStyle(selectedStyle);
+        popoto.graph.centerRootNode();
+    });
+
+    function selectStyle(style) {
+        $('link[title]').each(function (i, link) {
+            link.disabled = (link.title != style);
+        });
+    }
+
+    popoto.query.RESULTS_PAGE_SIZE = 10;
+    d3.select("#res-display").on("change", function () {
+        popoto.query.RESULTS_PAGE_SIZE = this.options[this.selectedIndex].value;
+        popoto.result.hasChanged = true;
+        popoto.update();
+    });
+
+    // logger level is set to INFO to see generated Cypher queries in console logs
+    popoto.logger.LEVEL = popoto.logger.LogLevels.INFO;
+
+    /**
+     * Define the Label provider you need for your application.
+     * This configuration is mandatory and should contain at least all the labels you could find in your graph model.
+     *
+     * In this version only nodes with a label are supported.
+     *
+     * By default If no attributes are specified Neo4j internal ID will be used.
+     * These label provider configuration can be used to customize the node display in the graph.
+     * See www.popotojs.com or example for more details on available configuration options.
+     */
+    popoto.provider.nodeProviders = {
+        "PollingStation": {
+            "returnAttributes": [
+                "facilityType",
+                "generalTerrain",
+                "precintNumber",
+                "pollingPlaceAddress",
+                "completeAddress",
+                "city",
+                "county",
+                "surveyCompletedBy",
+                "pollingPlaceName",
+                "website",
+                "finalAccessiblityDetermination",
+                "images",
+                "longitude",
+                "latitude",
+                "pollingPlaceId",
+                "surveyDate"],
+            "constraintAttribute": "pollingPlaceName",
+            "getDisplayType": function (node) {
+                return popoto.provider.NodeDisplayTypes.SVG;
+            },
+            "getSVGPaths": function (d) {
+                if (d.type === popoto.graph.node.NodeTypes.ROOT && d.value === undefined) {
+                    var paths = [];
+                    var initialPaths;
+                    if (svgData.hasOwnProperty(d.label)) {
+                        initialPaths = svgData[d.label].paths;
+                    } else {
+                        initialPaths = svgData["Social"].paths;
+                    }
+
+                    initialPaths.forEach(function (p) {
+                        paths.push({
+                            "d": p.d,
+                            "class": "svg-root"
+                        });
+                    });
+                    return paths;
+                } else {
+                    if (svgData.hasOwnProperty(d.label)) {
+                        return svgData[d.label].paths;
+                    } else {
+                        return svgData["Social"].paths;
+                    }
+                }
+            },
+            "getTextValue": function (node) {
+                if (node.type === popoto.graph.node.NodeTypes.VALUE) {
+                    return node.attributes.name;
+                } else {
+                    if (node.value === undefined) {
+                        return localizer.getLocalizedLabel("Labels", node.label);
+                    } else {
+                        return node.value.attributes.name;
+                    }
+                }
+            },
+            "getSemanticValue": function (node) {
+                if (node.type === popoto.graph.node.NodeTypes.VALUE) {
+                    return node.attributes.name;
+                } else {
+                    if (node.value === undefined) {
+                        return localizer.getSemanticLocalizedLabel("Labels", node.label);
+                    } else {
+                        return node.value.attributes.name;
+                    }
+                }
+            },
+            "getIsTextDisplayed": function (node) {
+                return false;
+            },
+            "displayResults": displayResults // this function has been extracted to reuse it for Landmarks
+        },
+        "Category": {
+            "returnAttributes": ["name"],
+            "constraintAttribute": "name"
+        },
+        "SubCategory": {
+            "children": childrenNodesForSubCategory,
+            "getIsGroup": function (node) {
+                return true;
+            },
+            "getTextValue": function (node) {
+                return localizer.getLocalizedLabel("Labels", node.label);
+            },
+            "getSemanticValue": function (node) {
+                return localizer.getSemanticLocalizedLabel("Labels", node.label);
+            },
+            "isSearchable": false
+        },
+        "Question": {
+            "returnAttributes": ["name"],
+            "constraintAttribute": "name"
+        },
+        "Option": {
+            "children": childrenNodesForOption,
+            "getIsGroup": function (node) {
+                return true;
+            },
+            "getTextValue": function (node) {
+                return localizer.getLocalizedLabel("Labels", node.label);
+            },
+            "getSemanticValue": function (node) {
+                return localizer.getSemanticLocalizedLabel("Labels", node.label);
+            },
+            "isSearchable": false
+        },
+        "Boolean": {
+            "children": childrenNodesForBoolean,
+            "returnAttributes": ["value"],
+            "constraintAttribute": "value",
+            "isSearchable": false,
+            "getDisplayType": function (node) {
+                return popoto.provider.NodeDisplayTypes.SVG;
+            },
+            "getIsTextDisplayed": function (node) {
+                return false;
+            },
+            "getTextValue": function (node) {
+                if (node.type === popoto.graph.node.NodeTypes.VALUE) {
+                    return localizer.getLocalizedLabel("Boolean", node.attributes.value);
+                } else {
+                    if (node.value === undefined) {
+                        return localizer.getLocalizedLabel("Labels", node.label);
+                    } else {
+                        return localizer.getLocalizedLabel("Boolean", node.value.attributes.value);
+                    }
+                }
+            },
+            "getSemanticValue": function (node) {
+                if (node.type === popoto.graph.node.NodeTypes.VALUE) {
+                    return localizer.getSemanticLocalizedLabel("Boolean", node.attributes.value);
+                } else {
+                    if (node.value === undefined) {
+                        return localizer.getSemanticLocalizedLabel("Labels", node.label);
+                    } else {
+                        return localizer.getSemanticLocalizedLabel("Boolean", node.value.attributes.value);
+                    }
+                }
+            },
+            "getSVGPaths": function (d) {
+                if (d.type === popoto.graph.node.NodeTypes.VALUE) {
+                    if (d.attributes.value == "Yes") {
+                        return svgData["Boolean"].truePaths;
+                    } else if (d.attributes.value == "No") {
+                        return svgData["Boolean"].falsePaths;
+                    } else {
+                        return svgData["Boolean"].falsePaths;
+                    }
+                } else {
+                    if (d.value === undefined) {
+                        var paths = [];
+
+                        if (d.count == 0) {
+                            svgData[d.label].paths.forEach(function (p) {
+                                paths.push({
+                                    "d": p.d,
+                                    "class": "svg-disabled"
+                                });
+                            });
+                        } else {
+                            if (svgData.hasOwnProperty(d.label)) {
+                                paths = svgData[d.label].paths;
+                            } else {
+                                paths = svgData["Boolean"].paths;
+                            }
+                        }
+                        return paths;
+                    } else {
+                        if (d.value.attributes.value) {
+                            return svgData["Boolean"].truePaths;
+                        } else {
+                            return svgData["Boolean"].falsePaths;
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    function displayResults(pElmt) {
+        pElmt.on("mouseover", function (d) {
+            if (d.mapLayer) {
+                d.mapLayer.setIcon(L.icon({
+                    iconUrl: 'icon/ballot_purple_32.png',
+                    iconSize: [32, 32],
+                    iconAnchor: [28, 28],
+                    popupAnchor: [0, -34]
+                }));
+            }
+        });
+
+        pElmt.on("mouseout", function (d) {
+            if (d.mapLayer) {
+                d.mapLayer.setIcon(L.icon({
+                    iconUrl: 'icon/ballot_green_32.png',
+                    iconSize: [32, 32],
+                    iconAnchor: [28, 28],
+                    popupAnchor: [0, -34]
+                }));
+            }
+        });
+
+        pElmt.on("click", function (d) {
+            if (d.mapLayer) {
+                map.setView(d.mapLayer._latlng, 16);
+            }
+        });
+
+        var table = pElmt.append("table")
+                .attr("class", "result-table");
+
+        var tr = table.append("tr")
+                .attr("id", "row1");
+        var tr2 = table.append("tr")
+                .attr("id", "row2");
+
+        // Name
+        tr.append("td")
+                .append("h3")
+                .append("a")
+                .attr("href", function (d) {
+                    if (d.attributes.website) {
+                        websiteURL = d.attributes.website;
+                        if (!/^(http|https):\/\//.test(websiteURL)) {
+                            websiteURL = "http://" + websiteURL;
+                        }
+                        return websiteURL;
+                    } else {
+                        return "#";
+                    }
+                })
+                .attr("target", "_blank")
+                .text(function (d) {
+                    return toTitleCase(d.attributes.pollingPlaceName);
+                });
+
+        tr2.append("td")
+                .append("a")
+                .attr("href", function (d) {
+                    if (d.attributes.completeAddress) {
+                        googleMapsURL = "http://maps.google.com/?q=" + d.attributes.completeAddress
+                        return googleMapsURL;
+                    } else {
+                        return "#";
+                    }
+                })
+                .attr("target", "_blank")
+                .append("font")
+                .attr("color", "yellow")
+                .text(function (d) {
+                    return d.attributes.completeAddress;
+                });
+    }
+
+
+    // Define the label provider used to customize the link displayed text:
+    popoto.provider.linkProvider = {
+
+        // Customize the text displayed on links:
+        "getLinkTextValue": function (link) {
+
+            // The links labels are just changed in lower case in this example.
+            // But it is possible to use a localization mechanism here to replace values.
+            if (link.type === popoto.graph.link.LinkTypes.RELATION) {
+                return localizer.getLocalizedLabel("Links", link.label);
+            } else {
+                return popoto.provider.DEFAULT_LINK_PROVIDER.getLinkTextValue(link);
+            }
+        },
+
+        // Customize the text displayed on links:
+        "getLinkSemanticValue": function (link) {
+
+            if (link.type === popoto.graph.link.LinkTypes.RELATION) {
+                return localizer.getLocalizedLabel("Links", "P_" + link.label);
+            } else {
+                return popoto.provider.DEFAULT_LINK_PROVIDER.getLinkTextValue(link);
+            }
+        }
+    };
+
+    // Define the label provider used to customize the taxonomies:
+    popoto.provider.taxonomyProvider = {
+        // Customize the text displayed on links:
+        "getTextValue": function (label) {
+            return localizer.getLocalizedLabel("Labels", label);
+        }
+    };
+
+    /**
+     * Here a listener is used to retrieve the total results count and update the page accordingly.
+     * This listener will be called on every graph modification.
+     */
+    popoto.result.onTotalResultCount(function (count) {
+        document.getElementById("result-total-count").innerHTML = "(" + count + ")";
+    });
+
+    /**
+     * The number of results returned can be changed with the following parameter.
+     * Default value is 100.
+     *
+     * Note that in this current version no pagination mechanism is available in displayed results
+     */
+    popoto.query.RESULTS_PAGE_SIZE = 1000;
+
+
+    /**
+     * For this version, popoto.js has been generated with debug traces you can activate with the following properties:
+     * The value can be one in DEBUG, INFO, WARN, ERROR, NONE.
+     *
+     * With INFO level all the executed cypher query can be seen in the navigator console.
+     * Default is NONE
+     */
+    //popoto.logger.LEVEL = popoto.logger.LogLevels.INFO;
+
+    /**
+     * Start popoto.js generation.
+     * The function requires the label to use as root element in the graph.
+     */
+
+    mLayer.on('mouseover', function (e) {
+        e.layer.openPopup();
+        e.layer.setIcon(L.icon({
+            iconUrl: 'icon/ballot_purple_32.png',
+            iconSize: [32, 32],
+            iconAnchor: [28, 28],
+            popupAnchor: [0, -34]
+        }));
+    });
+
+    mLayer.on('mouseout', function (e) {
+        //e.layer.closePopup();
+        e.layer.setIcon(L.icon({
+            iconUrl: 'icon/ballot_green_32.png',
+            iconSize: [32, 32],
+            iconAnchor: [28, 28],
+            popupAnchor: [0, -34]
+        }));
+    });
+
+    mLayer.on('layeradd', function (e) {
+        var marker = e.layer;
+        var feature = marker.feature;
+        var prop = feature.properties;
+        var images = prop.images;
+        var slideshowContent = '';
+
+        for (var i = 0; i < images.length; i++) {
+            var img = images[i];
+
+            slideshowContent += '<div class="image' + (i === 0 ? ' active' : '') + '">' +
+                    '<img src="' + img[0] + '" />' +
+                    '<div class="caption">' + img[1] + '</div>' +
+                    '</div>';
+        }
+
+        var popupContent = '<div id="' + prop.id + '" class="popup">' +
+                '<h3>' + prop.pollingPlaceName + '</h3><h4><tr><a href="' + prop.googleMapsURL + '">' + prop.completeAddress + '</a></h4>' +
+                '<div class="slideshow">' +
+                slideshowContent +
+                '</div>' +
+                '<div class="cycle">' +
+                '<a href="#" class="prev">&laquo; Previous</a>' +
+                '<a href="#" class="next">Next &raquo;</a>' +
+                '</div>' +
+                '</div>';
+
+        marker.setIcon(L.icon({
+            iconUrl: 'icon/ballot_green_32.png',
+            iconSize: [32, 32],
+            iconAnchor: [28, 28],
+            popupAnchor: [0, -34]
+        }));
+
+        marker.bindPopup(popupContent, {
+            closeButton: false,
+            minWidth: 320
+        });
+    });
+
+    $('#map').on('click', '.popup .cycle a', function () {
+        var $slideshow = $('.slideshow'),
+                $newSlide;
+
+        if ($(this).hasClass('prev')) {
+            $newSlide = $slideshow.find('.active').prev();
+            if ($newSlide.index() < 0) {
+                $newSlide = $('.image').last();
+            }
+        } else {
+            $newSlide = $slideshow.find('.active').next();
+            if ($newSlide.index() < 0) {
+                $newSlide = $('.image').first();
+            }
+        }
+
+        $slideshow.find('.active').removeClass('active').hide();
+        $newSlide.addClass('active').show();
+        return false;
+    });
+
+    mLayer.on('click', function (e) {
+        map.setView(e.latlng, 16);
+    });
+
+    /**
+     * Add a listener on result received to update map.
+     */
+    popoto.result.onResultReceived(
+            function (resultObjects) {
+                var geojson = createGeojson(resultObjects);
+                mLayer.setGeoJSON(geojson);
+
+                if (mLayer.getBounds().isValid()) {
+                    map.fitBounds(mLayer.getBounds().pad(0.1));
+                }
+
+                var index = 0;
+                mLayer.eachLayer(function (aLayer) {
+                    resultObjects[index].mapLayer = aLayer;
+                    index++;
+                });
+            }
+    );
+
+    /**
+     * Create a Geojson object usable by mapbox from the result list.
+     *
+     * @param resultObjects
+     * @returns {{type: string, features: Array}}
+     */
+    function createGeojson(resultObjects) {
+        var features = [];
+
+        for (var i = 0; i < resultObjects.length; i++) {
+            var longitude = Number(resultObjects[i].attributes.longitude);
+            var latitude = Number(resultObjects[i].attributes.latitude);
+
+            if (longitude && latitude) {
+                features.push({
+                    "resultObject": resultObjects[i],
+                    "type": "Feature",
+                    "properties": {
+                        "pollingPlaceName": toTitleCase(resultObjects[i].attributes.pollingPlaceName),
+                        "pollingPlaceAddress": resultObjects[i].attributes.pollingPlaceAddress,
+                        "county": resultObjects[i].attributes.county,
+                        "postcode": resultObjects[i].attributes.postcode,
+                        "locality": resultObjects[i].attributes.locality,
+                        "tel": resultObjects[i].attributes.tel,
+                        "completeAddress": resultObjects[i].attributes.completeAddress,
+                        "website": resultObjects[i].attributes.website,
+                        "googleMapsURL": "http://maps.google.com/?q=" + resultObjects[i].attributes.completeAddress,
+                        "images": getImagesData(resultObjects[i].attributes.images)
+                        /*
+                         "images": [
+                         ['https://i.imgur.com/O6QEpBs.jpg', 'The U.S. Capitol after the burning of Washington during the War of 1812'],
+                         ['https://i.imgur.com/xND1MND.jpg', 'Ford Theatre in the 19th century, site of the 1865 assassination of President Lincoln'],
+                         ['https://i.imgur.com/EKJmqui.jpg', 'The National Cherry Blossom Festival is celebrated around the city each spring.']
+                         ]
+                         */
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [
+                            longitude,
+                            latitude
+                        ]
+                    }
+                });
+            }
+        }
+
+        return {
+            "type": "FeatureCollection",
+            "features": features
+        };
+    }
+
+    function getImagesData(imagesData) {
+        var jsonArray = JSON.parse(imagesData)
+        var imagesArray = new Array(jsonArray.length);
+
+        i = 0
+        for (var x in jsonArray) {
+            valuePair = JSON.parse(x)
+            imagesArray[i] = new Array(2);
+            imagesArray[i][0] = jsonArray[x]["URL"]
+            imagesArray[i][1] = jsonArray[x]["DESCRIPTION"]
+            i++
+        }
+
+        return imagesArray
+    }
+
+    function toTitleCase(str) {
+        return str.replace(/\w\S*/g, function (txt) {
+            return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+        });
+    }
+
+    // Load localized labels
+    d3.json("locale/" + locale + ".json", function (error, localizedLabels) {
+        labels = localizedLabels;
+
+        // Start the generation using parameter as root label of the query.
+        popoto.start("PollingStation");
+    });
+</script>
+</body>
+</html>
