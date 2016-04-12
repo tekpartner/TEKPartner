@@ -8,10 +8,10 @@ This repository includes the two files that **must be included** in all project 
 *Please complete the information below:*
 
 ### Project Name
-[Enter a project title]
+Polling Station Accessibility
 
 ### Project Description
-[Enter a short description]
+"Polling Station Accessibility" offers the ability to learn about accessibility barriers at polling station(s) in order to identify alternatives before election day.
 
 ### Team Members
 - [Chandra Gaajula, chandra@TEKPartner.net]
@@ -19,14 +19,37 @@ This repository includes the two files that **must be included** in all project 
 - [Bhushan Ladde, bhushan.ladde@TEKPartner.net]
 
 ### Stakeholder Engagement
-- [If you worked with County staff to develop your project, please enter the name and department of your contact]
-- [Include any nonprofits or other stakeholders you engaged in the development your project]
+- Courtney Bailey
+- Guy Sperry
 
 ### Developer Documentation
-[Include any necessary instructions for developers to setup their local development environment and deploy your project to a production server]
+There are multiple Java projects that are bundled into our repo:
+1) ExtractAndPopulate - This extracts data from data.saccounty.net for Voter Registration Information.
+2) GeocodingServices - This is a helper project that helps resolve addresses.
+3) ImageManager - This is a helper project that helps with retrieving the images for the Polling Stations from flickr based on tags.
+4) voter_registration - This contains the UI code
+
+Steps:
+1) In order to build the Neo4j database, with data from data.saccounty.net, follow the following steps:
+a) Modify the class ExtractAndPopulate.java to replace all values with the pattern "XX_VARIABLE_XX" to valid values
+b) Modify absolute paths for directories with values that are valid for your environment
+c) Execute the program with the command -> java net.tekpartner.hack4sac.voterregistration.ExtractAndPopulate -g true -h true -d File
+
+2) In the voter_registration project, make the following modifications:
+a) Modify the file index.html to replace the following values:
+i) L.mapbox.accessToken
+ii) popoto.rest.CYPHER_URL
+iii) popoto.rest.AUTHORIZATION
+iv) websiteURLPrefix
+
+3) Execution of Step 1 results in the generation of static HTML files for all the Polling Stations. These files need to be stored inside the directory "data_tables" that exists in the project "voter_registration"
+
 
 ### Additional Information (optional)
-[Include any additional information that you would like the judges to know about your project]
+Key Technologies Used:
+1) Neo4j Database
+2) Flickr for Image Management
+3) Popotojs (Javascript Framework)
 
 ## Submission Instructions
 
