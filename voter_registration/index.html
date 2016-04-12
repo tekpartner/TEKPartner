@@ -81,7 +81,7 @@
 <script>
 
     //----------------------------- MAPBOX initialization
-    L.mapbox.accessToken = "<<<L.mapbox.accessToken>>>";
+    L.mapbox.accessToken = "XX_MAPBOX_ACCESS_TOKEN_XX";
     var map = L.mapbox.map('map', 'mapbox.streets');
     map.scrollWheelZoom.disable();
     var mLayer = L.mapbox.featureLayer().addTo(map);
@@ -93,7 +93,7 @@
      *
      * For more information on Neo4J REST API the documentation is available here: http://neo4j.com/docs/stable/rest-api-cypher.html
      */
-	 popoto.rest.CYPHER_URL = "http://localhost:7474/db/data/transaction";
+    popoto.rest.CYPHER_URL = "http://localhost:7474/db/data/transaction";
 
     /**
      * Add this authorization property if your Neo4j server uses basic HTTP authentication.
@@ -103,7 +103,10 @@
      *
      *  For example Base64 encoded value of "neo4j:password" is "bmVvNGo6cGFzc3dvcmQ="
      */
-	 popoto.rest.AUTHORIZATION = "Basic " + btoa("neo4j:neo4j");
+    popoto.rest.AUTHORIZATION = "Basic " + btoa("neo4j:neo4J");
+    
+
+    websiteURLPrefix = "http://XX_PORTAL_ADDRESS_XX/voter-reg/html_output/data_tables/"
 
     var childrenNodesForOption = [
         "NODE_5_signage",
@@ -934,11 +937,13 @@
             }
         });
 
-        pElmt.on("click", function (d) {
-            if (d.mapLayer) {
-                map.setView(d.mapLayer._latlng, 16);
-            }
-        });
+        /*
+         pElmt.on("click", function (d) {
+         if (d.mapLayer) {
+         map.setView(d.mapLayer._latlng, 16);
+         }
+         });
+         */
 
         var table = pElmt.append("table")
                 .attr("class", "result-table");
@@ -956,7 +961,7 @@
                     if (d.attributes.website) {
                         websiteURL = d.attributes.website;
                         if (!/^(http|https):\/\//.test(websiteURL)) {
-                            websiteURL = "http://" + websiteURL;
+                            websiteURL = websiteURLPrefix + websiteURL;
                         }
                         return websiteURL;
                     } else {
@@ -1185,13 +1190,6 @@
                         "website": resultObjects[i].attributes.website,
                         "googleMapsURL": "http://maps.google.com/?q=" + resultObjects[i].attributes.completeAddress,
                         "images": getImagesData(resultObjects[i].attributes.images)
-                        /*
-                         "images": [
-                         ['https://i.imgur.com/O6QEpBs.jpg', 'The U.S. Capitol after the burning of Washington during the War of 1812'],
-                         ['https://i.imgur.com/xND1MND.jpg', 'Ford Theatre in the 19th century, site of the 1865 assassination of President Lincoln'],
-                         ['https://i.imgur.com/EKJmqui.jpg', 'The National Cherry Blossom Festival is celebrated around the city each spring.']
-                         ]
-                         */
                     },
                     "geometry": {
                         "type": "Point",

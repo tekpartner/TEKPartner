@@ -4,12 +4,10 @@ import net.tekpartner.imagemanager.flickr.FlickrPhoto;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
 
+import java.io.File;
 import java.io.PrintWriter;
 import java.net.URISyntaxException;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by DELL on 3/31/2016.
@@ -47,15 +45,16 @@ public class StaticHtmlPages {
             }
             //logger.debug("value is:"+requireMapping);
 
+            List<String> pollingStationData = new ArrayList<>();
             section = p.getSections().iterator();
             while (section.hasNext()) {
                 String test = Utility.trimmer(section.next());
                 //logger.debug(test);
-
                 Iterator<String> category = p.getCategories(test).iterator();
                 while (category.hasNext()) {
                     String thisCategory = category.next();
                     //logger.debug("Category : " + thisCategory);
+
                     Iterator<String> subcategory = p.getSubCategories(Utility.trimmer(test), Utility.trimmer(thisCategory)).iterator();
                     while (subcategory.hasNext()) {
                         String thisSubcategory = subcategory.next();
@@ -77,7 +76,15 @@ public class StaticHtmlPages {
                                 }
 
                             } else {
+                                List<String> childList = new ArrayList<>();
                                 // Code to create dynamic table rows
+                                childList.add(new String("\"" + Utility.replaceDoubleQuotesToIncludeEscapeCharacters(thisCategory) + "\""));
+                                childList.add(new String("\"" + Utility.replaceDoubleQuotesToIncludeEscapeCharacters(thisSubcategory) + "\""));
+                                childList.add(new String("\"" + Utility.replaceDoubleQuotesToIncludeEscapeCharacters(thisQuestion.getQuestion()) + "\""));
+                                childList.add(new String("\"" + Utility.replaceDoubleQuotesToIncludeEscapeCharacters(thisQuestion.getAnswer()) + "\""));
+                                childList.add(new String("\"" + Utility.replaceDoubleQuotesToIncludeEscapeCharacters(thisQuestion.getData()) + "\""));
+                                childList.add(new String("\"" + Utility.replaceDoubleQuotesToIncludeEscapeCharacters(thisQuestion.getComments()) + "\""));
+                                pollingStationData.add(childList.toString());
 
                                 String strv = "  <tr>" +
                                         "		<td>" + thisCategory + "</td>" +
@@ -102,33 +109,47 @@ public class StaticHtmlPages {
                             }
                         }
                     }
-
                 }
             }
+            this.writeHtmlFileForPollingStation(poll_id, "{\"data\": " + pollingStationData.toString() + "}");
 
             try {
                 address.append(Utility.getCompletePollingStationAddress(poll_id, pollingplace_address, city));
             } catch (URISyntaxException e) {
                 e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
             }
-            this.writeHtmlFile(poll_id, getStaticPartOfHtmlPage(pollingPlaceName, address.toString(), flickrPhotos) + mainData.toString() + getHtmlFooter());
+            this.writeHtmlFile(poll_id, getStaticPartOfHtmlPage(poll_id, pollingPlaceName, address.toString(), flickrPhotos));
         }
     }
-
 
     private String getHtmlFooter() {
         return "</table>" + "</body>" + "</html>";
     }
 
-    private String getStaticPartOfHtmlPage(String pollingPlaceName, String address, List<FlickrPhoto> flickrPhotos) {
+    private String getStaticPartOfHtmlPage(String pollingStationId, String pollingPlaceName, String address, List<FlickrPhoto> flickrPhotos) {
         String htmlHeader =
                 "<!DOCTYPE html>" +
                         "<html>" +
                         "<head>" +
                         "<link rel=\"stylesheet\" href=\"css/gallery.css\">" +
+                        "<link rel=\"stylesheet\" type=\"text/css\" href=\"https://cdn.datatables.net/1.10.11/css/jquery.dataTables.min.css\">" +
                         "</head>";
         String htmlBody =
                 "<body>" +
+                        "<script type=\"text/javascript\" language=\"javascript\" src=\"https://code.jquery.com/jquery-1.12.0.min.js\"></script>" +
+                        "<script type=\"text/javascript\" language=\"javascript\" src=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js\"></script>" +
+                        "<script type=\"text/javascript\" language=\"javascript\" src=\"https://cdn.datatables.net/1.10.11/js/jquery.dataTables.min.js\"></script>" +
+                        "<script type=\"text/javascript\" language=\"javascript\" src=\"https://cdn.datatables.net/1.10.11/js/dataTables.bootstrap.min.js\"></script>" +
+                        "<script type=\"text/javascript\" class=\"init\">" +
+                        "    $(document).ready(function () {" +
+                        "        $('#myTable').DataTable({" +
+                        "            ajax: '" + pollingStationId + ".json'," +
+                        "            scrollY: 600," +
+                        "            scrollCollapse: true," +
+                        "            paging: false" +
+                        "        });" +
+                        "    });" +
+                        "</script>" +
                         "<table border=\"1\" style=\"width:100%\">" +
                         "  <tr style=\"\">" +
                         "<div class=\"gallery\" align=\"center\">\n" +
@@ -147,13 +168,14 @@ public class StaticHtmlPages {
                         "    <div class=\"description\" align=\"center\">\n" +
                         "        <div id=\"id_description\"><h4>" + flickrPhotos.get(0).getDescription() + "</h4></div>\n" +
                         "    </div>" +
+                        "   </div>" +
                         "  </tr>" +
                         "</table>" +
                         "<br/> " +
                         "<br/>" +
 
-                        "<table  border=\"2\" style=\"width:100%\">" +
-
+                        "<table id=\"myTable\" class=\"display\" cellspacing=\"0\" width=\"100%\">" +
+                        "      <thead>" +
                         "      <tr>" +
                         "       <th>Category</th>" +
                         "		<th>Subcategory</th>" +
@@ -161,7 +183,11 @@ public class StaticHtmlPages {
                         "		<th>Answer</th>" +
                         "		<th>Data</th>" +
                         "		<th>Comments</th>		" +
-                        "      </tr>";
+                        "      </tr>" +
+                        "      </thead>" +
+                        "      </table>" +
+                        "      </body>" +
+                        "      </html>";
         return htmlHeader + htmlBody;
     }
 
@@ -172,15 +198,31 @@ public class StaticHtmlPages {
         while ((images.hasNext()) && (i < MAX_NUMBER_OF_PHOTOS_PER_POLLING_STATION)) {
             FlickrPhoto thisPhoto = images.next();
             ++i;
-            patch = patch + "        <img onmouseover=\"preview.src=img" + i + ".src;id_description.innerHTML='<h4>" + thisPhoto.getDescription() + "</h4>'\" name=\"img" + i + "\"\n" +
+            patch = patch + "        <img onmouseover=\"preview.src=img" + i + ".src;id_description.innerHTML='<h4>" + Utility.replaceSingleQuotesToIncludeEscapeCharacters(thisPhoto.getDescription()) + "</h4>'\" name=\"img" + i + "\"\n" +
                     "src=\"" + thisPhoto.getImageURL() + "\" alt=\"\"/>\n";
         }
         return patch;
     }
 
-    private void writeHtmlFile(String fileName, String htmlText) {
+    private void writeHtmlFile(String pollingStationId, String htmlText) {
         try {
-            PrintWriter writer = new PrintWriter("C:\\tekpartner\\projects\\hack4sac\\voter_registration\\html_output\\" + fileName + ".html", "UTF-8");
+            String fileName = "C:\\tekpartner\\projects\\hack4sac\\voter_registration\\html_output\\data_tables\\" + Utility.camelCase(pollingStationId) + ".html";
+            File file = new File(fileName);
+            file.getParentFile().mkdirs();
+            PrintWriter writer = new PrintWriter(fileName, "UTF-8");
+            writer.println(htmlText);
+            writer.close();
+        } catch (Exception e) {
+            logger.error("Got Exception during html file creation:" + e);
+        }
+    }
+
+    private void writeHtmlFileForPollingStation(String pollingStationId, String htmlText) {
+        try {
+            String fileName = "C:\\tekpartner\\projects\\hack4sac\\voter_registration\\html_output\\data_tables\\" + Utility.camelCase(pollingStationId) + ".json";
+            File file = new File(fileName);
+            file.getParentFile().mkdirs();
+            PrintWriter writer = new PrintWriter(file, "UTF-8");
             writer.println(htmlText);
             writer.close();
         } catch (Exception e) {

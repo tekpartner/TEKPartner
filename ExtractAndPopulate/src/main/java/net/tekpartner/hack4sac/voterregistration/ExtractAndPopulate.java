@@ -36,11 +36,10 @@ public class ExtractAndPopulate {
 
     private String SERVER_ROOT_URI = "http://localhost:7474/db/data/";
     private String user = "neo4j";
-    private String pass = "neo.!Q@W#E";
+    private String pass = "neo4j";
     private int limit_rows = 1000;
     private String data_location = "http://saccounty.cloudapi.junar.com/api/v2/datastreams/VRE-DENOR-FULL-LIST/data.csv/?auth_key=bab23f7e02c26374f1826b99dcce23e69d44c803&limit=" + limit_rows + "#sthash.4MKJTzJ4.dpuf";
     private String labelMainNode = "PollingStation";
-    private String webURLTemplateForPollingStations = "http://hack4sac.tekpartner.net.s3.amazonaws.com/voter-reg/html_output/##POLLING_STATION_ID##.html";
 
     private Map<String, PollingStation> graphData = new HashMap();
     private Map<String, Map<String, Map<String, Set<Question>>>> yesNoQuestions = new HashMap();
@@ -296,7 +295,7 @@ public class ExtractAndPopulate {
             this.addLabel(target, id, this.labelMainNode);
 
             this.addProperty(target, id, "images", Utility.getJSONArrayOfImagesForPollingStation(pollStationId).toString());
-            this.addProperty(target, id, "website", StringUtils.replace(webURLTemplateForPollingStations, "##POLLING_STATION_ID##", pollStationId));
+            this.addProperty(target, id, "website", pollStationId + ".html");
 
             URI option = this.createNode(target);
             this.addLabel(target, option, ExtractAndPopulate.LABEL_OPTION);

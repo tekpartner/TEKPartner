@@ -26,8 +26,8 @@ public class Utility {
     private static final Logger logger = Logger.getLogger(Utility.class.getName());
     public static final String VALUE_DELIMITER = "_";
 
-    private static final String flickrAPIKey = "<<<FLICKR_API_KEY>>>";
-    private static final String flickrUserName = "<<<FLICKR_USER_NAE>>>";
+    private static final String flickrAPIKey = "XX_FLICK_API_KEY_XX";
+    private static final String flickrUserName = "XX_FLICKR_USER_NAME_XX";
     private static final String flickrTagPrefix = "saccounty_ppid_";
     private static final FlickrManager flickrManager = new FlickrManager(flickrAPIKey);
     private static final GeocodingManager geocodingManager = new GeocodingManager();
@@ -123,7 +123,7 @@ public class Utility {
         String concatenatedInputString = StringUtils.trimToEmpty(pollingPlaceAddress) + " " + StringUtils.trimToEmpty(pollingPlaceCity);
 
         if (!concatenatedInputString.trim().isEmpty()) {
-            List<MatchingAddress> listMatchingAddresses = geocodingManager.getMatchingAddresses(concatenatedInputString, "<<<GeoEncodingAPIKey>>>");
+            List<MatchingAddress> listMatchingAddresses = geocodingManager.getMatchingAddresses(concatenatedInputString, "XX_GEO_ENCODING_API_KEY_XX");
             for (MatchingAddress matchingAddress : listMatchingAddresses) {
                 completePollingStationAddress = matchingAddress.getMatchedAddress();
                 break;
@@ -133,5 +133,33 @@ public class Utility {
         }
 
         return completePollingStationAddress;
+    }
+
+    /**
+     * Replace Double Quotes in Text with Escape Characters
+     * @param inputString
+     * @return
+     */
+    public static String replaceDoubleQuotesToIncludeEscapeCharacters(String inputString) {
+        String returnValue = StringUtils.EMPTY;
+        if (!StringUtils.isEmpty(inputString)) {
+            returnValue = inputString.replace("\"", "\\\"");
+        }
+
+        return returnValue;
+    }
+
+    /**
+     * Replace Single Quotes in Text with Escape Characters
+     * @param inputString
+     * @return
+     */
+    public static String replaceSingleQuotesToIncludeEscapeCharacters(String inputString) {
+        String returnValue = StringUtils.EMPTY;
+        if (!StringUtils.isEmpty(inputString)) {
+            returnValue = inputString.replace("\'", "\\\'");
+        }
+
+        return returnValue;
     }
 }
